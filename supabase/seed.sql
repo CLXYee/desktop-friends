@@ -1,0 +1,1 @@
+-- Add development seed data after the application schema and migrations exist.

@@ -1,0 +1,6 @@
+{
+  "id": "lovie",
+  "displayName": "Lovie",
+  "defaultAnimation": "waving",
+  "animations": ["waving", "studying", "sleeping", "gaming"]
+}

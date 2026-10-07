@@ -1,0 +1,1 @@
+Add `waving.png`, `studying.png`, `sleeping.png`, and `gaming.png` sprite sheets here. Each sheet should use the 4-column by 2-row grid described in `animations.json`.

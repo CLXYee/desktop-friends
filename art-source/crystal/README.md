@@ -1,0 +1,1 @@
+Store original illustrations, editable artwork, and intermediate animation frames for Crystal here. Runtime sprite sheets belong in `public/avatars/crystal/`.

@@ -1,0 +1,1 @@
+Store original illustrations, editable artwork, and intermediate animation frames for Starry here. Runtime sprite sheets belong in `public/avatars/starry/`.

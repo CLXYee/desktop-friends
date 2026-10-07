@@ -1,0 +1,6 @@
+{
+  "id": "clover",
+  "displayName": "Clover",
+  "defaultAnimation": "waving",
+  "animations": ["waving", "studying", "sleeping", "gaming"]
+}

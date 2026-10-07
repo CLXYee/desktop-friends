@@ -1,0 +1,6 @@
+{
+  "id": "crystal",
+  "displayName": "Crystal",
+  "defaultAnimation": "waving",
+  "animations": ["waving", "studying", "sleeping", "gaming"]
+}

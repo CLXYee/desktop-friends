@@ -1,0 +1,1 @@
+Project setup and architecture notes belong here.

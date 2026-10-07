@@ -1,0 +1,1 @@
+Add focused tests here as group access, messaging, and avatar animation selection are implemented.

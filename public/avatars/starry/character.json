@@ -1,0 +1,6 @@
+{
+  "id": "starry",
+  "displayName": "Starry",
+  "defaultAnimation": "waving",
+  "animations": ["waving", "studying", "sleeping", "gaming"]
+}

@@ -1,0 +1,6 @@
+{
+  "id": "cloudy",
+  "displayName": "Cloudy",
+  "defaultAnimation": "waving",
+  "animations": ["waving", "studying", "sleeping", "gaming"]
+}
