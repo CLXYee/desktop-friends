@@ -60,3 +60,25 @@ describe('validation', () => {
     expect(isIdleMinutes(241)).toBe(false);
   });
 });
+
+describe('choosePosture with breaks', () => {
+  // Defaults: settle after 5 min, study 20 min, break 3 min.
+  const at2pm = at('14:00');
+
+  it('never takes a break for characters that cannot leave', () => {
+    expect(choosePosture(at2pm, minutesAgo(at2pm, 26), defaultPostureSchedule)).toBe('studying');
+  });
+
+  it('studies, then steps out, then comes back to study', () => {
+    expect(choosePosture(at2pm, minutesAgo(at2pm, 24), defaultPostureSchedule, true)).toBe('studying');
+    expect(choosePosture(at2pm, minutesAgo(at2pm, 25), defaultPostureSchedule, true)).toBe('away');
+    expect(choosePosture(at2pm, minutesAgo(at2pm, 27), defaultPostureSchedule, true)).toBe('away');
+    expect(choosePosture(at2pm, minutesAgo(at2pm, 28), defaultPostureSchedule, true)).toBe('studying');
+    expect(choosePosture(at2pm, minutesAgo(at2pm, 48), defaultPostureSchedule, true)).toBe('away');
+  });
+
+  it('sleeps instead of taking breaks late at night', () => {
+    const lateNight = at('01:00');
+    expect(choosePosture(lateNight, minutesAgo(lateNight, 26), defaultPostureSchedule, true)).toBe('sleeping');
+  });
+});

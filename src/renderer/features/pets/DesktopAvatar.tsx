@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
-import { characters } from '../../../shared/characters';
+import { characters, postureAsActivity } from '../../../shared/characters';
 import type { CompanionSettings } from '../../../shared/types';
 import { CrystalAnimationPreview } from './CrystalAnimationPreview';
+import { LivelyAvatar, type LivelyAvatarHandle } from './lively/LivelyAvatar';
 
 const DRAG_THRESHOLD = 3;
 
@@ -10,6 +11,7 @@ export function DesktopAvatar() {
   const [isDragging, setIsDragging] = useState(false);
   const dragStart = useRef<{ offsetX: number; offsetY: number; screenX: number; screenY: number } | null>(null);
   const hasMoved = useRef(false);
+  const livelyRef = useRef<LivelyAvatarHandle>(null);
 
   useEffect(() => {
     let active = true;
@@ -54,6 +56,7 @@ export function DesktopAvatar() {
     dragStart.current = null;
     setIsDragging(false);
     if (hasMoved.current) window.desktopFriends.avatar.endDrag();
+    else livelyRef.current?.jump();
   };
 
   if (!settings) return null;
@@ -74,12 +77,22 @@ export function DesktopAvatar() {
         window.desktopFriends.avatar.showContextMenu();
       }}
     >
-      <CrystalAnimationPreview
-        characterId={character.id}
-        displayName={character.name}
-        activity={settings.activity}
-        className="desktop-avatar-canvas"
-      />
+      {character.gestures ? (
+        <LivelyAvatar
+          ref={livelyRef}
+          characterId={character.id}
+          displayName={character.name}
+          posture={settings.activity}
+          className="desktop-avatar-canvas"
+        />
+      ) : (
+        <CrystalAnimationPreview
+          characterId={character.id}
+          displayName={character.name}
+          activity={postureAsActivity(settings.activity)}
+          className="desktop-avatar-canvas"
+        />
+      )}
     </div>
   );
 }

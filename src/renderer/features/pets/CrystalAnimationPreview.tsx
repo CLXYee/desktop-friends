@@ -97,7 +97,10 @@ export function CrystalAnimationPreview({
           });
         });
 
-        sprite = new AnimatedSprite(frames);
+        // Advance the sprite on this app's ticker (not Pixi's shared one) and draw only when the frame
+        // changes: every frame then lands on time, without redrawing an unchanged picture 60 times a second.
+        let needsRender = true;
+        sprite = new AnimatedSprite({ textures: frames, autoUpdate: false });
         sprite.anchor.set(0.5);
         sprite.animationSpeed = animation.fps / 60;
         sprite.loop = animation.loop;
@@ -105,11 +108,16 @@ export function CrystalAnimationPreview({
           if (!sprite) return;
           const offsetX = animation.frameOffsetsX?.[frameIndex] ?? 0;
           sprite.x = container.clientWidth / 2 + offsetX * sprite.scale.x;
+          needsRender = true;
         };
         currentApplication.stage.addChild(sprite);
-        // The sheet only changes frame `fps` times a second; redrawing at the display's 60Hz wastes CPU/GPU.
-        // Twice the animation rate keeps frame timing even on 60Hz vsync.
-        currentApplication.ticker.maxFPS = animation.fps * 2;
+        currentApplication.ticker.remove(currentApplication.render, currentApplication);
+        currentApplication.ticker.add((ticker) => {
+          sprite?.update(ticker);
+          if (!needsRender) return;
+          needsRender = false;
+          currentApplication.render();
+        });
 
         const resize = () => {
           const width = container.clientWidth;
@@ -121,6 +129,7 @@ export function CrystalAnimationPreview({
             sprite.scale.set(scale);
             sprite.position.set(width / 2 + offsetX * scale, height / 2);
           }
+          needsRender = true;
         };
 
         resizeObserver = new ResizeObserver(resize);

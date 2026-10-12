@@ -8,9 +8,13 @@
     "frameHeight": 512
   },
   "animations": {
-    "waving": { "image": "waving.png", "frames": [0, 1, 2, 3, 4, 5, 6, 7], "fps": 8, "loop": true },
+    "waving": { "image": "waving.png", "frames": [0, 1, 2, 3, 4, 5, 6, 7], "frameOffsetsY": [0, 0, 0, 0, 4, 4, 4, 4], "fps": 8, "loop": true },
     "studying": { "image": "studying.png", "frames": [0, 1, 2, 3, 4, 5, 6, 7], "fps": 8, "loop": true },
-    "sleeping": { "image": "sleeping.png", "frames": [0, 1, 2, 3, 4, 5, 6, 7], "fps": 6, "loop": true },
-    "gaming": { "image": "gaming.png", "frames": [0, 1, 2, 3, 4, 5, 6, 7], "fps": 8, "loop": true }
+    "sleeping": { "image": "sleeping.png", "frames": [0, 1, 2, 3, 4, 5, 6, 7], "frameOffsetsY": [0, 0, 0, 0, 2, 2, 2, 2], "fps": 6, "loop": true },
+    "gaming": { "image": "gaming.png", "frames": [0, 1, 2, 3, 4, 5, 6, 7], "fps": 8, "loop": true },
+    "walking": { "image": "walking.png", "frames": [0, 1, 2, 3, 4, 5, 6, 7], "fps": 10, "loop": true, "optional": true, "fallback": "waving" },
+    "jumping": { "image": "jumping.png", "frames": [0, 1, 2, 3, 4, 5, 6, 7], "fps": 11, "loop": false, "optional": true, "fallback": "waving" },
+    "leaving": { "image": "leaving.png", "frames": [0, 1, 2, 3, 4], "fps": 6, "loop": false, "optional": true, "fallback": "waving" },
+    "waveGoodbye": { "image": "leaving.png", "frames": [5, 6, 7, 6, 7], "fps": 6, "loop": false, "optional": true, "fallback": "waving" }
   }
 }

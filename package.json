@@ -10,7 +10,8 @@
     "make": "electron-forge make",
     "publish": "electron-forge publish",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "sprites:pack": "electron scripts/pack-sprites.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.50.0",

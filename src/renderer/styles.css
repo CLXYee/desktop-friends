@@ -156,6 +156,7 @@ h2 { margin-top: 10px; font-size: 27px; }
 .preview-column .preview-controls { flex-wrap: wrap; gap: 10px 16px; }
 .preview-column .activity-picker span { white-space: nowrap; }
 .friend-stage .avatar-preview-stage { width: 100%; border-color: var(--friend-tint); border-radius: 18px; background: var(--friend-soft); transition: background-color .35s, border-color .35s; }
+.avatar-preview-stage-lively { cursor: pointer; }
 .friend-stage .preview-sun { background: var(--friend-main); opacity: .45; transition: background-color .35s; }
 .friend-stage .preview-ground { background: var(--friend-tint); }
 .friend-stage .preview-live { color: var(--friend-accent); }

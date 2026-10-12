@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { isActivity, isCharacterId } from '../shared/characters';
 import { defaultCompanionSettings as defaultSettings } from '../shared/companionSettings';
-import { isIdleMinutes, isTimeOfDay } from '../shared/posture';
+import { isAwayMinutes, isIdleMinutes, isTimeOfDay } from '../shared/posture';
 import type { CompanionSettings } from '../shared/types';
 
 const settingsPath = () => path.join(app.getPath('userData'), 'companion-settings.json');
@@ -23,6 +23,8 @@ export const loadSettings = (): CompanionSettings => {
       idleMinutes: isIdleMinutes(stored.idleMinutes) ? stored.idleMinutes : defaultSettings.idleMinutes,
       bedtime: isTimeOfDay(stored.bedtime) ? stored.bedtime : defaultSettings.bedtime,
       wakeTime: isTimeOfDay(stored.wakeTime) ? stored.wakeTime : defaultSettings.wakeTime,
+      leaveAfterMinutes: isIdleMinutes(stored.leaveAfterMinutes) ? stored.leaveAfterMinutes : defaultSettings.leaveAfterMinutes,
+      awayMinutes: isAwayMinutes(stored.awayMinutes) ? stored.awayMinutes : defaultSettings.awayMinutes,
       avatarVisible: typeof stored.avatarVisible === 'boolean' ? stored.avatarVisible : defaultSettings.avatarVisible,
       alwaysOnTop: typeof stored.alwaysOnTop === 'boolean' ? stored.alwaysOnTop : defaultSettings.alwaysOnTop,
       hideInFullscreen: typeof stored.hideInFullscreen === 'boolean' ? stored.hideInFullscreen : defaultSettings.hideInFullscreen,

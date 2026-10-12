@@ -1,11 +1,50 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { defaultPostureSchedule, isIdleMinutes, isTimeOfDay, MAX_IDLE_MINUTES, MIN_IDLE_MINUTES } from '../../../shared/posture';
-import type { Activity, CompanionSettings, CompanionSettingsUpdate } from '../../../shared/types';
+import {
+  defaultPostureSchedule,
+  isTimeOfDay,
+  MAX_AWAY_MINUTES,
+  MAX_IDLE_MINUTES,
+  MIN_IDLE_MINUTES,
+} from '../../../shared/posture';
+import type { CompanionSettings, CompanionSettingsUpdate, Posture } from '../../../shared/types';
 
 interface PostureSettingsProps {
   characterName: string;
+  /** Characters with the "leave" gesture study in rounds and step out between them. */
+  canTakeBreaks: boolean;
   settings: CompanionSettings;
   onChange: (patch: CompanionSettingsUpdate) => void;
+}
+
+interface MinutesInputProps {
+  label: string;
+  value: number;
+  max: number;
+  onCommit: (minutes: number) => void;
+}
+
+/** Keeps a draft so the field can be briefly empty or out of range while typing. */
+function MinutesInput({ label, value, max, onCommit }: MinutesInputProps) {
+  const [draft, setDraft] = useState(String(value));
+  useEffect(() => setDraft(String(value)), [value]);
+
+  return (
+    <input
+      className="routine-input routine-input-minutes"
+      type="number"
+      inputMode="numeric"
+      aria-label={label}
+      min={MIN_IDLE_MINUTES}
+      max={max}
+      value={draft}
+      onChange={(event) => {
+        setDraft(event.target.value);
+        const minutes = Number(event.target.value);
+        if (Number.isInteger(minutes) && minutes >= MIN_IDLE_MINUTES && minutes <= max) onCommit(minutes);
+      }}
+      onBlur={() => setDraft(String(value))}
+    />
+  );
 }
 
 interface RoutineStepProps {
@@ -30,15 +69,13 @@ function RoutineStep({ icon, title, isCurrent, children }: RoutineStepProps) {
   );
 }
 
-export function PostureSettings({ characterName, settings, onChange }: PostureSettingsProps) {
-  // Keep a draft so the number field can be briefly empty or out of range while typing.
-  const [idleDraft, setIdleDraft] = useState(String(settings.idleMinutes));
-  useEffect(() => setIdleDraft(String(settings.idleMinutes)), [settings.idleMinutes]);
-
+export function PostureSettings({ characterName, canTakeBreaks, settings, onChange }: PostureSettingsProps) {
   const isDefault = settings.idleMinutes === defaultPostureSchedule.idleMinutes
     && settings.bedtime === defaultPostureSchedule.bedtime
-    && settings.wakeTime === defaultPostureSchedule.wakeTime;
-  const isCurrent = (activity: Activity) => settings.autoPosture && settings.activity === activity;
+    && settings.wakeTime === defaultPostureSchedule.wakeTime
+    && settings.leaveAfterMinutes === defaultPostureSchedule.leaveAfterMinutes
+    && settings.awayMinutes === defaultPostureSchedule.awayMinutes;
+  const isCurrent = (posture: Posture) => settings.autoPosture && settings.activity === posture;
 
   return (
     <section className="routine-card" aria-labelledby="routine-title">
@@ -67,23 +104,33 @@ export function PostureSettings({ characterName, settings, onChange }: PostureSe
           </RoutineStep>
           <RoutineStep icon="📚" title="Studying" isCurrent={isCurrent('studying')}>
             After
-            <input
-              className="routine-input routine-input-minutes"
-              type="number"
-              inputMode="numeric"
-              aria-label="Minutes alone before studying"
-              min={MIN_IDLE_MINUTES}
+            <MinutesInput
+              label="Minutes alone before studying"
+              value={settings.idleMinutes}
               max={MAX_IDLE_MINUTES}
-              value={idleDraft}
-              onChange={(event) => {
-                setIdleDraft(event.target.value);
-                const minutes = Number(event.target.value);
-                if (isIdleMinutes(minutes)) onChange({ idleMinutes: minutes });
-              }}
-              onBlur={() => setIdleDraft(String(settings.idleMinutes))}
+              onCommit={(idleMinutes) => onChange({ idleMinutes })}
             />
             min alone
           </RoutineStep>
+          {canTakeBreaks && (
+            <RoutineStep icon="🚪" title="Taking a break" isCurrent={isCurrent('away')}>
+              After
+              <MinutesInput
+                label="Minutes of studying before a break"
+                value={settings.leaveAfterMinutes}
+                max={MAX_IDLE_MINUTES}
+                onCommit={(leaveAfterMinutes) => onChange({ leaveAfterMinutes })}
+              />
+              min studying, back in
+              <MinutesInput
+                label="Minutes away on a break"
+                value={settings.awayMinutes}
+                max={MAX_AWAY_MINUTES}
+                onCommit={(awayMinutes) => onChange({ awayMinutes })}
+              />
+              min
+            </RoutineStep>
+          )}
           <RoutineStep icon="🌙" title="Sleeping" isCurrent={isCurrent('sleeping')}>
             When alone at night
             <span className="routine-time-range">

@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain, Menu, screen, Tray, type MenuItemConstructorOptions } from 'electron';
 import path from 'node:path';
-import { activities, characters, isActivity, isCharacterId } from '../shared/characters';
-import { choosePosture, isIdleMinutes, isTimeOfDay } from '../shared/posture';
+import { activities, characters, hasGesture, isActivity, isCharacterId } from '../shared/characters';
+import { choosePosture, isAwayMinutes, isIdleMinutes, isTimeOfDay } from '../shared/posture';
 import type { CompanionSettings, CompanionSettingsUpdate } from '../shared/types';
 import { watchFullscreen } from './fullscreenWatcher';
 import { loadSettings, saveSettings } from './settings';
@@ -76,6 +76,8 @@ const updateSettings = (patch: Partial<CompanionSettings>): void => {
     || settings.idleMinutes !== previous.idleMinutes
     || settings.bedtime !== previous.bedtime
     || settings.wakeTime !== previous.wakeTime
+    || settings.leaveAfterMinutes !== previous.leaveAfterMinutes
+    || settings.awayMinutes !== previous.awayMinutes
   ) {
     refreshPosture();
   }
@@ -87,7 +89,7 @@ const updateSettings = (patch: Partial<CompanionSettings>): void => {
 
 const refreshPosture = (): void => {
   if (!settings.autoPosture) return;
-  const posture = choosePosture(new Date(), lastInteractionAt, settings);
+  const posture = choosePosture(new Date(), lastInteractionAt, settings, hasGesture(settings.characterId, 'leave'));
   if (posture !== settings.activity) updateSettings({ activity: posture });
 };
 
@@ -336,6 +338,8 @@ const registerIpc = (): void => {
     if (isIdleMinutes(patch.idleMinutes)) accepted.idleMinutes = patch.idleMinutes;
     if (isTimeOfDay(patch.bedtime)) accepted.bedtime = patch.bedtime;
     if (isTimeOfDay(patch.wakeTime)) accepted.wakeTime = patch.wakeTime;
+    if (isIdleMinutes(patch.leaveAfterMinutes)) accepted.leaveAfterMinutes = patch.leaveAfterMinutes;
+    if (isAwayMinutes(patch.awayMinutes)) accepted.awayMinutes = patch.awayMinutes;
     if (typeof patch.avatarVisible === 'boolean') accepted.avatarVisible = patch.avatarVisible;
     if (typeof patch.alwaysOnTop === 'boolean') accepted.alwaysOnTop = patch.alwaysOnTop;
     if (typeof patch.hideInFullscreen === 'boolean') accepted.hideInFullscreen = patch.hideInFullscreen;
@@ -355,10 +359,8 @@ const registerIpc = (): void => {
     updateSettings({ avatarPosition: { x, y } });
   });
 
-  ipcMain.on('avatar:interact', (event) => {
-    if (!avatarWindow || event.sender !== avatarWindow.webContents) return;
-    registerInteraction();
-  });
+  // Touching the friend on the desktop or in the app's preview.
+  ipcMain.on('avatar:interact', registerInteraction);
 
   ipcMain.on('avatar:context-menu', (event) => {
     if (!avatarWindow || event.sender !== avatarWindow.webContents) return;

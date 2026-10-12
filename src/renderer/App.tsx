@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
-import { activities, characters } from '../shared/characters';
+import { useEffect, useRef, useState } from 'react';
+import { activities, characters, hasGesture, postureAsActivity, postureLabel } from '../shared/characters';
 import { defaultCompanionSettings } from '../shared/companionSettings';
 import type { Activity, CompanionSettings, CompanionSettingsUpdate } from '../shared/types';
 import { CrystalAnimationPreview } from './features/pets/CrystalAnimationPreview';
 import { characterThemeStyle } from './features/pets/characterThemes';
+import { LivelyAvatar, type LivelyAvatarHandle } from './features/pets/lively/LivelyAvatar';
 import { PostureSettings } from './features/pets/PostureSettings';
 
 const AUTOMATIC = 'automatic';
@@ -12,7 +13,8 @@ export function App() {
   const [settings, setSettings] = useState<CompanionSettings>(defaultCompanionSettings);
   const { characterId, activity, avatarVisible } = settings;
   const character = characters.find((item) => item.id === characterId) ?? characters[0];
-  const activityLabel = activities.find((item) => item.value === activity)?.label.toLowerCase();
+  const activityLabel = postureLabel(activity).toLowerCase();
+  const livelyRef = useRef<LivelyAvatarHandle>(null);
   const companion: Window['desktopFriends'] | undefined = window.desktopFriends;
 
   // The pickers drive the friend on the desktop; tray menu and automatic posture changes flow back here.
@@ -87,14 +89,23 @@ export function App() {
                 <p className="eyebrow">{character.name.toUpperCase()} / ANIMATION PREVIEW</p>
                 <span className="preview-live"><i />LIVE</span>
               </div>
-              <div className="avatar-preview-stage">
+              <div
+                className={`avatar-preview-stage${character.gestures ? ' avatar-preview-stage-lively' : ''}`}
+                // Touching a lively friend in the preview counts like touching it on the desktop.
+                onPointerDown={character.gestures ? () => companion?.avatar.interact() : undefined}
+                onClick={character.gestures ? () => livelyRef.current?.jump() : undefined}
+              >
                 <span className="preview-sun" aria-hidden="true" />
                 <span className="preview-ground" aria-hidden="true" />
-                <CrystalAnimationPreview
-                  characterId={character.id}
-                  displayName={character.name}
-                  activity={activity}
-                />
+                {character.gestures ? (
+                  <LivelyAvatar ref={livelyRef} characterId={character.id} displayName={character.name} posture={activity} />
+                ) : (
+                  <CrystalAnimationPreview
+                    characterId={character.id}
+                    displayName={character.name}
+                    activity={postureAsActivity(activity)}
+                  />
+                )}
               </div>
               <h2>{character.name}</h2>
               <p className="empty-copy">
@@ -137,7 +148,12 @@ export function App() {
             </div>
 
             {companion && (
-              <PostureSettings characterName={character.name} settings={settings} onChange={updateCompanion} />
+              <PostureSettings
+                characterName={character.name}
+                canTakeBreaks={hasGesture(character.id, 'leave')}
+                settings={settings}
+                onChange={updateCompanion}
+              />
             )}
           </section>
 
