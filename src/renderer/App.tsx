@@ -1,24 +1,26 @@
 import { useEffect, useState } from 'react';
 import { activities, characters } from '../shared/characters';
+import { defaultCompanionSettings } from '../shared/companionSettings';
 import type { Activity, CompanionSettings, CompanionSettingsUpdate } from '../shared/types';
 import { CrystalAnimationPreview } from './features/pets/CrystalAnimationPreview';
+import { characterThemeStyle } from './features/pets/characterThemes';
+import { PostureSettings } from './features/pets/PostureSettings';
+
+const AUTOMATIC = 'automatic';
 
 export function App() {
-  const [characterId, setCharacterId] = useState('crystal');
-  const [activity, setActivity] = useState<Activity>('waving');
-  const [avatarVisible, setAvatarVisible] = useState(true);
+  const [settings, setSettings] = useState<CompanionSettings>(defaultCompanionSettings);
+  const { characterId, activity, avatarVisible } = settings;
   const character = characters.find((item) => item.id === characterId) ?? characters[0];
+  const activityLabel = activities.find((item) => item.value === activity)?.label.toLowerCase();
   const companion: Window['desktopFriends'] | undefined = window.desktopFriends;
 
-  // The picker drives the friend on the desktop; tray menu changes flow back here.
+  // The pickers drive the friend on the desktop; tray menu and automatic posture changes flow back here.
   useEffect(() => {
     if (!companion) return;
     let active = true;
-    const apply = (settings: CompanionSettings) => {
-      if (!active) return;
-      setCharacterId(settings.characterId);
-      setActivity(settings.activity);
-      setAvatarVisible(settings.avatarVisible);
+    const apply = (next: CompanionSettings) => {
+      if (active) setSettings(next);
     };
     void companion.getSettings().then(apply);
     const unsubscribe = companion.onSettingsChanged(apply);
@@ -29,9 +31,7 @@ export function App() {
   }, [companion]);
 
   const updateCompanion = (patch: CompanionSettingsUpdate) => {
-    if (patch.characterId) setCharacterId(patch.characterId);
-    if (patch.activity) setActivity(patch.activity);
-    if (patch.avatarVisible !== undefined) setAvatarVisible(patch.avatarVisible);
+    setSettings((current) => ({ ...current, ...patch }));
     companion?.updateSettings(patch);
   };
 
@@ -81,46 +81,64 @@ export function App() {
             <span className="online-count">0 ONLINE</span>
           </section>
 
-          <section className="empty-state">
-            <div className="preview-heading">
-              <p className="eyebrow">{character.name.toUpperCase()} / ANIMATION PREVIEW</p>
-              <span className="preview-live"><i />LIVE</span>
-            </div>
-            <div className="avatar-preview-stage">
-              <span className="preview-sun" aria-hidden="true" />
-              <span className="preview-ground" aria-hidden="true" />
-              <CrystalAnimationPreview
-                characterId={character.id}
-                displayName={character.name}
-                activity={activity}
-              />
-            </div>
-            <h2>{character.name}</h2>
-            <p className="empty-copy">Previewing {activities.find((item) => item.value === activity)?.label.toLowerCase()}.</p>
-            <div className="preview-controls">
-              <label className="activity-picker">
-                <span>Character</span>
-                <select value={characterId} onChange={(event) => updateCompanion({ characterId: event.target.value })}>
-                  {characters.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                </select>
-              </label>
-              <label className="activity-picker">
-                <span>Animation</span>
-                <select value={activity} onChange={(event) => updateCompanion({ activity: event.target.value as Activity })}>
-                  {activities.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
-                </select>
-              </label>
-              {companion && (
+          <section className="empty-state friend-stage" style={characterThemeStyle(character.id)}>
+            <div className="preview-column">
+              <div className="preview-heading">
+                <p className="eyebrow">{character.name.toUpperCase()} / ANIMATION PREVIEW</p>
+                <span className="preview-live"><i />LIVE</span>
+              </div>
+              <div className="avatar-preview-stage">
+                <span className="preview-sun" aria-hidden="true" />
+                <span className="preview-ground" aria-hidden="true" />
+                <CrystalAnimationPreview
+                  characterId={character.id}
+                  displayName={character.name}
+                  activity={activity}
+                />
+              </div>
+              <h2>{character.name}</h2>
+              <p className="empty-copy">
+                {settings.autoPosture
+                  ? `${character.name} is ${activityLabel} right now. Posture changes automatically.`
+                  : `Previewing ${activityLabel}.`}
+              </p>
+              <div className="preview-controls">
                 <label className="activity-picker">
-                  <input
-                    type="checkbox"
-                    checked={avatarVisible}
-                    onChange={(event) => updateCompanion({ avatarVisible: event.target.checked })}
-                  />
-                  <span>Show on desktop</span>
+                  <span>Character</span>
+                  <select value={characterId} onChange={(event) => updateCompanion({ characterId: event.target.value })}>
+                    {characters.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                  </select>
                 </label>
-              )}
+                <label className="activity-picker">
+                  <span>Animation</span>
+                  <select
+                    value={settings.autoPosture ? AUTOMATIC : activity}
+                    onChange={(event) => updateCompanion(
+                      event.target.value === AUTOMATIC
+                        ? { autoPosture: true }
+                        : { autoPosture: false, activity: event.target.value as Activity },
+                    )}
+                  >
+                    <option value={AUTOMATIC}>Automatic</option>
+                    {activities.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+                  </select>
+                </label>
+                {companion && (
+                  <label className="activity-picker">
+                    <input
+                      type="checkbox"
+                      checked={avatarVisible}
+                      onChange={(event) => updateCompanion({ avatarVisible: event.target.checked })}
+                    />
+                    <span>Show on desktop</span>
+                  </label>
+                )}
+              </div>
             </div>
+
+            {companion && (
+              <PostureSettings characterName={character.name} settings={settings} onChange={updateCompanion} />
+            )}
           </section>
 
           <footer className="workspace-footer">

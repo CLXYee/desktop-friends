@@ -25,6 +25,11 @@ export interface FriendMessage {
 export interface CompanionSettings {
   characterId: string;
   activity: Activity;
+  /** When on, the friend picks its own posture: waving, then studying, or sleeping late at night. */
+  autoPosture: boolean;
+  idleMinutes: number;
+  bedtime: string;
+  wakeTime: string;
   avatarVisible: boolean;
   alwaysOnTop: boolean;
   hideInFullscreen: boolean;
@@ -34,5 +39,6 @@ export interface CompanionSettings {
 
 export type CompanionSettingsUpdate = Partial<Pick<
   CompanionSettings,
-  'characterId' | 'activity' | 'avatarVisible' | 'alwaysOnTop' | 'hideInFullscreen'
+  | 'characterId' | 'activity' | 'autoPosture' | 'idleMinutes' | 'bedtime' | 'wakeTime'
+  | 'avatarVisible' | 'alwaysOnTop' | 'hideInFullscreen'
 >>;

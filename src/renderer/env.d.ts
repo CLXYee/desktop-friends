@@ -12,6 +12,7 @@ interface Window {
       moveTo: (x: number, y: number) => void;
       endDrag: () => void;
       showContextMenu: () => void;
+      interact: () => void;
     };
   };
 }

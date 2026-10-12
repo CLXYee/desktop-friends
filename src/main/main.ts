@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, Menu, screen, Tray, type MenuItemConstructorOptions } from 'electron';
 import path from 'node:path';
 import { activities, characters, isActivity, isCharacterId } from '../shared/characters';
+import { choosePosture, isIdleMinutes, isTimeOfDay } from '../shared/posture';
 import type { CompanionSettings, CompanionSettingsUpdate } from '../shared/types';
 import { watchFullscreen } from './fullscreenWatcher';
 import { loadSettings, saveSettings } from './settings';
@@ -14,6 +15,7 @@ const AVATAR_SCREEN_MARGIN = 24;
 // and ends up behind every window. "screen-saver" skips that taskbar placement.
 const AVATAR_ON_TOP_LEVEL = process.platform === 'win32' ? 'screen-saver' : 'floating';
 const AVATAR_ON_TOP_CHECK_MS = 2000;
+const POSTURE_CHECK_MS = 15_000;
 
 let mainWindow: BrowserWindow | null = null;
 let avatarWindow: BrowserWindow | null = null;
@@ -22,6 +24,8 @@ let settings: CompanionSettings;
 let isQuitting = false;
 let isFullscreenAppActive = false;
 let canDetectFullscreen = false;
+// Opening the app counts as an interaction, so the friend starts out waving.
+let lastInteractionAt = Date.now();
 
 const startHidden = process.argv.includes('--hidden');
 
@@ -63,6 +67,33 @@ const updateSettings = (patch: Partial<CompanionSettings>): void => {
     if (window && !window.isDestroyed()) window.webContents.send('settings:changed', settings);
   }
   refreshTrayMenu();
+
+  // A newly picked character arrives waving.
+  if (settings.characterId !== previous.characterId) lastInteractionAt = Date.now();
+  if (
+    settings.characterId !== previous.characterId
+    || settings.autoPosture !== previous.autoPosture
+    || settings.idleMinutes !== previous.idleMinutes
+    || settings.bedtime !== previous.bedtime
+    || settings.wakeTime !== previous.wakeTime
+  ) {
+    refreshPosture();
+  }
+};
+
+// ---------------------------------------------------------------------------
+// Automatic posture: waving after an interaction, then studying, or sleeping late at night.
+// ---------------------------------------------------------------------------
+
+const refreshPosture = (): void => {
+  if (!settings.autoPosture) return;
+  const posture = choosePosture(new Date(), lastInteractionAt, settings);
+  if (posture !== settings.activity) updateSettings({ activity: posture });
+};
+
+const registerInteraction = (): void => {
+  lastInteractionAt = Date.now();
+  refreshPosture();
 };
 
 // ---------------------------------------------------------------------------
@@ -249,12 +280,20 @@ const buildMenuTemplate = (): MenuItemConstructorOptions[] => [
   },
   {
     label: 'Animation',
-    submenu: activities.map((activity) => ({
-      label: activity.label,
-      type: 'radio',
-      checked: settings.activity === activity.value,
-      click: () => updateSettings({ activity: activity.value }),
-    })),
+    submenu: [
+      {
+        label: 'Automatic',
+        type: 'radio',
+        checked: settings.autoPosture,
+        click: () => updateSettings({ autoPosture: true }),
+      },
+      ...activities.map((activity): MenuItemConstructorOptions => ({
+        label: activity.label,
+        type: 'radio',
+        checked: !settings.autoPosture && settings.activity === activity.value,
+        click: () => updateSettings({ autoPosture: false, activity: activity.value }),
+      })),
+    ],
   },
   { label: 'Move friend back to corner', click: resetAvatarPosition },
   { type: 'separator' },
@@ -291,6 +330,12 @@ const registerIpc = (): void => {
     const accepted: CompanionSettingsUpdate = {};
     if (isCharacterId(patch.characterId)) accepted.characterId = patch.characterId;
     if (isActivity(patch.activity)) accepted.activity = patch.activity;
+    if (typeof patch.autoPosture === 'boolean') accepted.autoPosture = patch.autoPosture;
+    // Picking a specific animation pins it until automatic posture is turned back on.
+    else if (accepted.activity) accepted.autoPosture = false;
+    if (isIdleMinutes(patch.idleMinutes)) accepted.idleMinutes = patch.idleMinutes;
+    if (isTimeOfDay(patch.bedtime)) accepted.bedtime = patch.bedtime;
+    if (isTimeOfDay(patch.wakeTime)) accepted.wakeTime = patch.wakeTime;
     if (typeof patch.avatarVisible === 'boolean') accepted.avatarVisible = patch.avatarVisible;
     if (typeof patch.alwaysOnTop === 'boolean') accepted.alwaysOnTop = patch.alwaysOnTop;
     if (typeof patch.hideInFullscreen === 'boolean') accepted.hideInFullscreen = patch.hideInFullscreen;
@@ -308,6 +353,11 @@ const registerIpc = (): void => {
     if (!avatarWindow || event.sender !== avatarWindow.webContents) return;
     const [x, y] = avatarWindow.getPosition();
     updateSettings({ avatarPosition: { x, y } });
+  });
+
+  ipcMain.on('avatar:interact', (event) => {
+    if (!avatarWindow || event.sender !== avatarWindow.webContents) return;
+    registerInteraction();
   });
 
   ipcMain.on('avatar:context-menu', (event) => {
@@ -330,6 +380,8 @@ if (!app.requestSingleInstanceLock()) {
   app.whenReady().then(() => {
     if (process.platform === 'win32') app.setAppUserModelId('com.desktopfriends.app');
     settings = loadSettings();
+    refreshPosture();
+    setInterval(refreshPosture, POSTURE_CHECK_MS);
 
     registerIpc();
     canDetectFullscreen = watchFullscreen(() => avatarWindow, (isFullscreen) => {

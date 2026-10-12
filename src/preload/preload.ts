@@ -16,5 +16,6 @@ contextBridge.exposeInMainWorld('desktopFriends', {
     moveTo: (x: number, y: number): void => ipcRenderer.send('avatar:move', x, y),
     endDrag: (): void => ipcRenderer.send('avatar:drag-end'),
     showContextMenu: (): void => ipcRenderer.send('avatar:context-menu'),
+    interact: (): void => ipcRenderer.send('avatar:interact'),
   },
 });

@@ -24,6 +24,8 @@ export function DesktopAvatar() {
   }, []);
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    // Any touch (click, drag, right-click) wakes the friend up and makes it wave.
+    window.desktopFriends.avatar.interact();
     if (event.button !== 0) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     dragStart.current = {
