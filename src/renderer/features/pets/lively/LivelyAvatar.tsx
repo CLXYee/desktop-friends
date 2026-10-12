@@ -50,7 +50,8 @@ export function LivelyAvatar({ characterId, displayName, posture, className = 'a
       sceneRef.current?.destroy();
       sceneRef.current = null;
     };
-  }, [characterId]);
+  // Recreate the scene when Vite replaces its class, so layout fixes reach an existing preview.
+  }, [characterId, LivelyScene]);
 
   useEffect(() => {
     postureRef.current = posture;

@@ -392,7 +392,7 @@ export class LivelyScene {
 
   private burstSlam(): void {
     const unit = this.unit();
-    const width = this.app.renderer.width / this.app.renderer.resolution;
+    const width = this.app.screen.width;
     const doorX = width * DOOR_X;
     const groundY = this.groundY();
 
@@ -548,29 +548,32 @@ export class LivelyScene {
     this.app.render();
   };
 
+  // Pixi screen dimensions are logical pixels; dividing by resolution again offsets Retina layouts.
   private unit(): number {
-    return this.app.renderer.height / this.app.renderer.resolution / 240;
+    return this.app.screen.height / 240;
   }
 
   private groundY(): number {
-    return (this.app.renderer.height / this.app.renderer.resolution) * 0.97;
+    return (this.app.screen.height + this.metadata.sheet.frameHeight * this.baseScale()) / 2;
   }
 
   private baseScale(): number {
-    const width = this.app.renderer.width / this.app.renderer.resolution;
-    const height = this.app.renderer.height / this.app.renderer.resolution;
+    const width = this.app.screen.width;
+    const height = this.app.screen.height;
     const { frameWidth, frameHeight } = this.metadata.sheet;
-    return Math.min(width / frameWidth, height / frameHeight) * 0.82;
+    // Keep the original small preview size independently of display pixel density.
+    // Placement still uses the full logical stage, so the character stays centered.
+    return Math.min(width / frameWidth, height / frameHeight) * 0.41;
   }
 
   private characterCenter(): { x: number; y: number } {
-    const width = this.app.renderer.width / this.app.renderer.resolution;
+    const width = this.app.screen.width;
     const height = this.metadata.sheet.frameHeight * this.baseScale() * this.character.scale;
     return { x: width * this.character.x, y: this.groundY() - this.character.hop * this.unit() - height * 0.55 };
   }
 
   private apply(): void {
-    const width = this.app.renderer.width / this.app.renderer.resolution;
+    const width = this.app.screen.width;
     const unit = this.unit();
     const groundY = this.groundY();
     const base = this.baseScale();
