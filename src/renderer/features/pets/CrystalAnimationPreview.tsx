@@ -25,9 +25,15 @@ interface CrystalAnimationPreviewProps {
   characterId: string;
   displayName: string;
   activity: Activity;
+  className?: string;
 }
 
-export function CrystalAnimationPreview({ characterId, displayName, activity }: CrystalAnimationPreviewProps) {
+export function CrystalAnimationPreview({
+  characterId,
+  displayName,
+  activity,
+  className = 'avatar-preview-canvas',
+}: CrystalAnimationPreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState(false);
 
@@ -101,6 +107,9 @@ export function CrystalAnimationPreview({ characterId, displayName, activity }: 
           sprite.x = container.clientWidth / 2 + offsetX * sprite.scale.x;
         };
         currentApplication.stage.addChild(sprite);
+        // The sheet only changes frame `fps` times a second; redrawing at the display's 60Hz wastes CPU/GPU.
+        // Twice the animation rate keeps frame timing even on 60Hz vsync.
+        currentApplication.ticker.maxFPS = animation.fps * 2;
 
         const resize = () => {
           const width = container.clientWidth;
@@ -137,7 +146,7 @@ export function CrystalAnimationPreview({ characterId, displayName, activity }: 
   return (
     <div
       ref={containerRef}
-      className="avatar-preview-canvas"
+      className={className}
       role="img"
       aria-label={`${displayName} ${activity} animation preview`}
     >

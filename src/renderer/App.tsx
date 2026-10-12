@@ -1,26 +1,39 @@
-import { useState } from 'react';
-import type { Activity } from '../shared/types';
+import { useEffect, useState } from 'react';
+import { activities, characters } from '../shared/characters';
+import type { Activity, CompanionSettings, CompanionSettingsUpdate } from '../shared/types';
 import { CrystalAnimationPreview } from './features/pets/CrystalAnimationPreview';
-
-const activities: { value: Activity; label: string }[] = [
-  { value: 'waving', label: 'Waving' },
-  { value: 'studying', label: 'Studying' },
-  { value: 'sleeping', label: 'Sleeping' },
-  { value: 'gaming', label: 'Gaming' },
-];
-
-const characters = [
-  { id: 'crystal', name: 'Crystal' },
-  { id: 'lovie', name: 'Lovie' },
-  { id: 'cloudy', name: 'Cloudy' },
-  { id: 'starry', name: 'Starry' },
-  { id: 'clover', name: 'Clover' },
-];
 
 export function App() {
   const [characterId, setCharacterId] = useState('crystal');
   const [activity, setActivity] = useState<Activity>('waving');
+  const [avatarVisible, setAvatarVisible] = useState(true);
   const character = characters.find((item) => item.id === characterId) ?? characters[0];
+  const companion: Window['desktopFriends'] | undefined = window.desktopFriends;
+
+  // The picker drives the friend on the desktop; tray menu changes flow back here.
+  useEffect(() => {
+    if (!companion) return;
+    let active = true;
+    const apply = (settings: CompanionSettings) => {
+      if (!active) return;
+      setCharacterId(settings.characterId);
+      setActivity(settings.activity);
+      setAvatarVisible(settings.avatarVisible);
+    };
+    void companion.getSettings().then(apply);
+    const unsubscribe = companion.onSettingsChanged(apply);
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [companion]);
+
+  const updateCompanion = (patch: CompanionSettingsUpdate) => {
+    if (patch.characterId) setCharacterId(patch.characterId);
+    if (patch.activity) setActivity(patch.activity);
+    if (patch.avatarVisible !== undefined) setAvatarVisible(patch.avatarVisible);
+    companion?.updateSettings(patch);
+  };
 
   return (
     <main className="app-shell">
@@ -87,16 +100,26 @@ export function App() {
             <div className="preview-controls">
               <label className="activity-picker">
                 <span>Character</span>
-                <select value={characterId} onChange={(event) => setCharacterId(event.target.value)}>
+                <select value={characterId} onChange={(event) => updateCompanion({ characterId: event.target.value })}>
                   {characters.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                 </select>
               </label>
               <label className="activity-picker">
                 <span>Animation</span>
-                <select value={activity} onChange={(event) => setActivity(event.target.value as Activity)}>
+                <select value={activity} onChange={(event) => updateCompanion({ activity: event.target.value as Activity })}>
                   {activities.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
                 </select>
               </label>
+              {companion && (
+                <label className="activity-picker">
+                  <input
+                    type="checkbox"
+                    checked={avatarVisible}
+                    onChange={(event) => updateCompanion({ avatarVisible: event.target.checked })}
+                  />
+                  <span>Show on desktop</span>
+                </label>
+              )}
             </div>
           </section>
 

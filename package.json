@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.50.0",
+    "koffi": "3.3.1",
     "pixi.js": "^8.9.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
@@ -38,6 +39,7 @@
     "electron@41.10.7": true,
     "fsevents@2.3.3": true,
     "fs-xattr@0.3.1": true,
-    "macos-alias@0.2.12": true
+    "macos-alias@0.2.12": true,
+    "koffi@3.3.1": false
   }
 }

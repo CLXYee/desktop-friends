@@ -21,3 +21,18 @@ export interface FriendMessage {
   body: string;
   createdAt: string;
 }
+
+export interface CompanionSettings {
+  characterId: string;
+  activity: Activity;
+  avatarVisible: boolean;
+  alwaysOnTop: boolean;
+  hideInFullscreen: boolean;
+  avatarPosition: { x: number; y: number } | null;
+  hasSeenTrayHint: boolean;
+}
+
+export type CompanionSettingsUpdate = Partial<Pick<
+  CompanionSettings,
+  'characterId' | 'activity' | 'avatarVisible' | 'alwaysOnTop' | 'hideInFullscreen'
+>>;
