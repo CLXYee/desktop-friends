@@ -85,6 +85,7 @@ const loadFrameSet = async (metadata: AnimationMetadata, assetBase: string, name
 // Layout, in fractions of the stage width / design units (240 = stage height).
 const CHARACTER_X = 0.5;
 const DOOR_X = 0.72;
+const DOOR_SCALE = 0.5;
 const EXIT_START_X = 0.3;
 const FAR_SCALE = 0.62;
 // While away nothing but the swinging sign moves, so a gentle redraw rate is plenty.
@@ -391,7 +392,7 @@ export class LivelyScene {
   }
 
   private burstSlam(): void {
-    const unit = this.unit();
+    const unit = this.unit() * DOOR_SCALE;
     const width = this.app.screen.width;
     const doorX = width * DOOR_X;
     const groundY = this.groundY();
@@ -589,7 +590,7 @@ export class LivelyScene {
     const d = this.doorState;
     this.door.container.visible = d.visible;
     this.door.container.position.set(width * DOOR_X, groundY);
-    this.door.container.scale.set(unit * d.scale);
+    this.door.container.scale.set(unit * DOOR_SCALE * d.scale);
     this.door.container.alpha = d.alpha;
     this.door.setOpenness(d.openness);
     this.door.sign.alpha = d.signAlpha;
