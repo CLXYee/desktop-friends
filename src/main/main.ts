@@ -1,8 +1,8 @@
-import { app, BrowserWindow, ipcMain, Menu, screen, Tray, type MenuItemConstructorOptions } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, powerMonitor, screen, Tray, type MenuItemConstructorOptions } from 'electron';
 import path from 'node:path';
 import { activities, characters, hasGesture, isActivity, isCharacterId } from '../shared/characters';
-import { choosePosture, isAwayMinutes, isIdleMinutes, isTimeOfDay } from '../shared/posture';
-import type { CompanionSettings, CompanionSettingsUpdate } from '../shared/types';
+import { isDuration, isTimeOfDay, postureTimeline } from '../shared/posture';
+import type { CompanionSettings, CompanionSettingsUpdate, PostureTimer } from '../shared/types';
 import { watchFullscreen } from './fullscreenWatcher';
 import { loadSettings, saveSettings } from './settings';
 import { createTrayIcon, createWindowIcon } from './trayIcon';
@@ -15,7 +15,8 @@ const AVATAR_SCREEN_MARGIN = 24;
 // and ends up behind every window. "screen-saver" skips that taskbar placement.
 const AVATAR_ON_TOP_LEVEL = process.platform === 'win32' ? 'screen-saver' : 'floating';
 const AVATAR_ON_TOP_CHECK_MS = 2000;
-const POSTURE_CHECK_MS = 15_000;
+// Postures switch on a timer set for the exact end of each phase; this check only catches clock jumps.
+const POSTURE_SAFETY_CHECK_MS = 30_000;
 
 let mainWindow: BrowserWindow | null = null;
 let avatarWindow: BrowserWindow | null = null;
@@ -26,6 +27,8 @@ let isFullscreenAppActive = false;
 let canDetectFullscreen = false;
 // Opening the app counts as an interaction, so the friend starts out waving.
 let lastInteractionAt = Date.now();
+let postureTimer: PostureTimer = { posture: 'waving', endsAt: null };
+let postureTimeout: NodeJS.Timeout | null = null;
 
 const startHidden = process.argv.includes('--hidden');
 
@@ -73,11 +76,11 @@ const updateSettings = (patch: Partial<CompanionSettings>): void => {
   if (
     settings.characterId !== previous.characterId
     || settings.autoPosture !== previous.autoPosture
-    || settings.idleMinutes !== previous.idleMinutes
+    || settings.idleSeconds !== previous.idleSeconds
     || settings.bedtime !== previous.bedtime
     || settings.wakeTime !== previous.wakeTime
-    || settings.leaveAfterMinutes !== previous.leaveAfterMinutes
-    || settings.awayMinutes !== previous.awayMinutes
+    || settings.studySeconds !== previous.studySeconds
+    || settings.breakSeconds !== previous.breakSeconds
   ) {
     refreshPosture();
   }
@@ -87,10 +90,26 @@ const updateSettings = (patch: Partial<CompanionSettings>): void => {
 // Automatic posture: waving after an interaction, then studying, or sleeping late at night.
 // ---------------------------------------------------------------------------
 
+const publishTimer = (timer: PostureTimer): void => {
+  if (timer.posture === postureTimer.posture && timer.endsAt === postureTimer.endsAt) return;
+  postureTimer = timer;
+  for (const window of [mainWindow, avatarWindow]) {
+    if (window && !window.isDestroyed()) window.webContents.send('posture:timer', postureTimer);
+  }
+};
+
 const refreshPosture = (): void => {
-  if (!settings.autoPosture) return;
-  const posture = choosePosture(new Date(), lastInteractionAt, settings, hasGesture(settings.characterId, 'leave'));
-  if (posture !== settings.activity) updateSettings({ activity: posture });
+  if (postureTimeout) clearTimeout(postureTimeout);
+  postureTimeout = null;
+  if (!settings.autoPosture) {
+    publishTimer({ posture: settings.activity, endsAt: null });
+    return;
+  }
+  const timeline = postureTimeline(new Date(), lastInteractionAt, settings, hasGesture(settings.characterId, 'leave'));
+  // Wake up right as this phase ends (a hair after, so the next check lands in the new phase).
+  postureTimeout = setTimeout(refreshPosture, Math.max(50, timeline.endsAt - Date.now() + 25));
+  publishTimer(timeline);
+  if (timeline.posture !== settings.activity) updateSettings({ activity: timeline.posture });
 };
 
 const registerInteraction = (): void => {
@@ -259,6 +278,12 @@ const buildMenuTemplate = (): MenuItemConstructorOptions[] => [
     click: (item) => updateSettings({ avatarVisible: item.checked }),
   },
   {
+    label: 'Show timer above friend',
+    type: 'checkbox',
+    checked: settings.showTimer,
+    click: (item) => updateSettings({ showTimer: item.checked }),
+  },
+  {
     label: 'Keep on top of other windows',
     type: 'checkbox',
     checked: settings.alwaysOnTop,
@@ -326,6 +351,7 @@ const createTray = (): void => {
 
 const registerIpc = (): void => {
   ipcMain.handle('settings:get', () => settings);
+  ipcMain.handle('posture:get-timer', () => postureTimer);
 
   ipcMain.on('settings:update', (_event, patch: CompanionSettingsUpdate) => {
     if (typeof patch !== 'object' || patch === null) return;
@@ -335,11 +361,12 @@ const registerIpc = (): void => {
     if (typeof patch.autoPosture === 'boolean') accepted.autoPosture = patch.autoPosture;
     // Picking a specific animation pins it until automatic posture is turned back on.
     else if (accepted.activity) accepted.autoPosture = false;
-    if (isIdleMinutes(patch.idleMinutes)) accepted.idleMinutes = patch.idleMinutes;
+    if (isDuration('idleSeconds', patch.idleSeconds)) accepted.idleSeconds = patch.idleSeconds;
     if (isTimeOfDay(patch.bedtime)) accepted.bedtime = patch.bedtime;
     if (isTimeOfDay(patch.wakeTime)) accepted.wakeTime = patch.wakeTime;
-    if (isIdleMinutes(patch.leaveAfterMinutes)) accepted.leaveAfterMinutes = patch.leaveAfterMinutes;
-    if (isAwayMinutes(patch.awayMinutes)) accepted.awayMinutes = patch.awayMinutes;
+    if (isDuration('studySeconds', patch.studySeconds)) accepted.studySeconds = patch.studySeconds;
+    if (isDuration('breakSeconds', patch.breakSeconds)) accepted.breakSeconds = patch.breakSeconds;
+    if (typeof patch.showTimer === 'boolean') accepted.showTimer = patch.showTimer;
     if (typeof patch.avatarVisible === 'boolean') accepted.avatarVisible = patch.avatarVisible;
     if (typeof patch.alwaysOnTop === 'boolean') accepted.alwaysOnTop = patch.alwaysOnTop;
     if (typeof patch.hideInFullscreen === 'boolean') accepted.hideInFullscreen = patch.hideInFullscreen;
@@ -383,7 +410,8 @@ if (!app.requestSingleInstanceLock()) {
     if (process.platform === 'win32') app.setAppUserModelId('com.desktopfriends.app');
     settings = loadSettings();
     refreshPosture();
-    setInterval(refreshPosture, POSTURE_CHECK_MS);
+    setInterval(refreshPosture, POSTURE_SAFETY_CHECK_MS);
+    powerMonitor.on('resume', refreshPosture);
 
     registerIpc();
     canDetectFullscreen = watchFullscreen(() => avatarWindow, (isFullscreen) => {

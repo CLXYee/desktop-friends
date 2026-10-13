@@ -5,6 +5,7 @@ import type { Activity, CompanionSettings, CompanionSettingsUpdate } from '../sh
 import { CrystalAnimationPreview } from './features/pets/CrystalAnimationPreview';
 import { characterThemeStyle } from './features/pets/characterThemes';
 import { LivelyAvatar, type LivelyAvatarHandle } from './features/pets/lively/LivelyAvatar';
+import { PostureCountdown, usePostureTimer } from './features/pets/PostureCountdown';
 import { PostureSettings } from './features/pets/PostureSettings';
 
 const AUTOMATIC = 'automatic';
@@ -15,6 +16,7 @@ export function App() {
   const character = characters.find((item) => item.id === characterId) ?? characters[0];
   const activityLabel = postureLabel(activity).toLowerCase();
   const livelyRef = useRef<LivelyAvatarHandle>(null);
+  const postureTimer = usePostureTimer();
   const companion: Window['desktopFriends'] | undefined = window.desktopFriends;
 
   // The pickers drive the friend on the desktop; tray menu and automatic posture changes flow back here.
@@ -95,6 +97,13 @@ export function App() {
                 onPointerDown={character.gestures ? () => companion?.avatar.interact() : undefined}
                 onClick={character.gestures ? () => livelyRef.current?.jump() : undefined}
               >
+                {settings.showTimer && settings.autoPosture && (
+                  <PostureCountdown
+                    timer={postureTimer}
+                    canTakeBreaks={hasGesture(character.id, 'leave')}
+                    className="posture-countdown-preview"
+                  />
+                )}
                 <span className="preview-sun" aria-hidden="true" />
                 <span className="preview-ground" aria-hidden="true" />
                 {character.gestures ? (

@@ -1,10 +1,11 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import {
   defaultPostureSchedule,
+  formatDuration,
+  isDuration,
   isTimeOfDay,
-  MAX_AWAY_MINUTES,
-  MAX_IDLE_MINUTES,
-  MIN_IDLE_MINUTES,
+  parseDuration,
+  type DurationField,
 } from '../../../shared/posture';
 import type { CompanionSettings, CompanionSettingsUpdate, Posture } from '../../../shared/types';
 
@@ -16,33 +17,38 @@ interface PostureSettingsProps {
   onChange: (patch: CompanionSettingsUpdate) => void;
 }
 
-interface MinutesInputProps {
+interface DurationInputProps {
   label: string;
+  field: DurationField;
   value: number;
-  max: number;
-  onCommit: (minutes: number) => void;
+  onCommit: (seconds: number) => void;
 }
 
-/** Keeps a draft so the field can be briefly empty or out of range while typing. */
-function MinutesInput({ label, value, max, onCommit }: MinutesInputProps) {
-  const [draft, setDraft] = useState(String(value));
-  useEffect(() => setDraft(String(value)), [value]);
+/** An "m:ss" field (a plain number means minutes). Keeps a draft while typing; invalid drafts aren't saved. */
+function DurationInput({ label, field, value, onCommit }: DurationInputProps) {
+  const [draft, setDraft] = useState(formatDuration(value));
+  useEffect(() => setDraft(formatDuration(value)), [value]);
+  const parsed = parseDuration(draft);
+  const isValid = parsed !== null && isDuration(field, parsed);
 
   return (
     <input
-      className="routine-input routine-input-minutes"
-      type="number"
+      className={`routine-input routine-input-duration${isValid ? '' : ' routine-input-invalid'}`}
+      type="text"
       inputMode="numeric"
-      aria-label={label}
-      min={MIN_IDLE_MINUTES}
-      max={max}
+      placeholder="m:ss"
+      aria-label={`${label} (minutes:seconds)`}
+      aria-invalid={!isValid}
       value={draft}
       onChange={(event) => {
         setDraft(event.target.value);
-        const minutes = Number(event.target.value);
-        if (Number.isInteger(minutes) && minutes >= MIN_IDLE_MINUTES && minutes <= max) onCommit(minutes);
+        const seconds = parseDuration(event.target.value);
+        if (seconds !== null && isDuration(field, seconds)) onCommit(seconds);
       }}
-      onBlur={() => setDraft(String(value))}
+      onBlur={() => setDraft(formatDuration(value))}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') event.currentTarget.blur();
+      }}
     />
   );
 }
@@ -70,11 +76,11 @@ function RoutineStep({ icon, title, isCurrent, children }: RoutineStepProps) {
 }
 
 export function PostureSettings({ characterName, canTakeBreaks, settings, onChange }: PostureSettingsProps) {
-  const isDefault = settings.idleMinutes === defaultPostureSchedule.idleMinutes
+  const isDefault = settings.idleSeconds === defaultPostureSchedule.idleSeconds
     && settings.bedtime === defaultPostureSchedule.bedtime
     && settings.wakeTime === defaultPostureSchedule.wakeTime
-    && settings.leaveAfterMinutes === defaultPostureSchedule.leaveAfterMinutes
-    && settings.awayMinutes === defaultPostureSchedule.awayMinutes;
+    && settings.studySeconds === defaultPostureSchedule.studySeconds
+    && settings.breakSeconds === defaultPostureSchedule.breakSeconds;
   const isCurrent = (posture: Posture) => settings.autoPosture && settings.activity === posture;
 
   return (
@@ -104,31 +110,30 @@ export function PostureSettings({ characterName, canTakeBreaks, settings, onChan
           </RoutineStep>
           <RoutineStep icon="📚" title="Studying" isCurrent={isCurrent('studying')}>
             After
-            <MinutesInput
-              label="Minutes alone before studying"
-              value={settings.idleMinutes}
-              max={MAX_IDLE_MINUTES}
-              onCommit={(idleMinutes) => onChange({ idleMinutes })}
+            <DurationInput
+              label="Time alone before studying"
+              field="idleSeconds"
+              value={settings.idleSeconds}
+              onCommit={(idleSeconds) => onChange({ idleSeconds })}
             />
-            min alone
+            alone
           </RoutineStep>
           {canTakeBreaks && (
             <RoutineStep icon="🚪" title="Taking a break" isCurrent={isCurrent('away')}>
               After
-              <MinutesInput
-                label="Minutes of studying before a break"
-                value={settings.leaveAfterMinutes}
-                max={MAX_IDLE_MINUTES}
-                onCommit={(leaveAfterMinutes) => onChange({ leaveAfterMinutes })}
+              <DurationInput
+                label="Focus session length"
+                field="studySeconds"
+                value={settings.studySeconds}
+                onCommit={(studySeconds) => onChange({ studySeconds })}
               />
-              min studying, back in
-              <MinutesInput
-                label="Minutes away on a break"
-                value={settings.awayMinutes}
-                max={MAX_AWAY_MINUTES}
-                onCommit={(awayMinutes) => onChange({ awayMinutes })}
+              of focus, back in
+              <DurationInput
+                label="Break length"
+                field="breakSeconds"
+                value={settings.breakSeconds}
+                onCommit={(breakSeconds) => onChange({ breakSeconds })}
               />
-              min
             </RoutineStep>
           )}
           <RoutineStep icon="🌙" title="Sleeping" isCurrent={isCurrent('sleeping')}>
@@ -157,6 +162,16 @@ export function PostureSettings({ characterName, canTakeBreaks, settings, onChan
           </RoutineStep>
         </ol>
       </fieldset>
+
+      <label className="routine-timer-toggle">
+        <input
+          type="checkbox"
+          checked={settings.showTimer}
+          disabled={!settings.autoPosture}
+          onChange={(event) => onChange({ showTimer: event.target.checked })}
+        />
+        <span>Show a countdown above {characterName}</span>
+      </label>
 
       <footer className="routine-footer">
         <span>

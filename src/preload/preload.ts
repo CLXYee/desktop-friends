@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
-import type { CompanionSettings, CompanionSettingsUpdate } from '../shared/types';
+import type { CompanionSettings, CompanionSettingsUpdate, PostureTimer } from '../shared/types';
 
 contextBridge.exposeInMainWorld('desktopFriends', {
   platform: process.platform,
@@ -10,6 +10,12 @@ contextBridge.exposeInMainWorld('desktopFriends', {
     const handler = (_event: IpcRendererEvent, settings: CompanionSettings) => listener(settings);
     ipcRenderer.on('settings:changed', handler);
     return () => ipcRenderer.removeListener('settings:changed', handler);
+  },
+  getPostureTimer: (): Promise<PostureTimer> => ipcRenderer.invoke('posture:get-timer'),
+  onPostureTimer: (listener: (timer: PostureTimer) => void): (() => void) => {
+    const handler = (_event: IpcRendererEvent, timer: PostureTimer) => listener(timer);
+    ipcRenderer.on('posture:timer', handler);
+    return () => ipcRenderer.removeListener('posture:timer', handler);
   },
   openMainWindow: (): void => ipcRenderer.send('app:open-main-window'),
   avatar: {

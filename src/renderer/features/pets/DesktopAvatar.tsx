@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
-import { characters, postureAsActivity } from '../../../shared/characters';
+import { characters, hasGesture, postureAsActivity } from '../../../shared/characters';
 import type { CompanionSettings } from '../../../shared/types';
+import { characterThemeStyle } from './characterThemes';
 import { CrystalAnimationPreview } from './CrystalAnimationPreview';
 import { LivelyAvatar, type LivelyAvatarHandle } from './lively/LivelyAvatar';
+import { PostureCountdown, usePostureTimer } from './PostureCountdown';
 
 const DRAG_THRESHOLD = 3;
 
@@ -12,6 +14,7 @@ export function DesktopAvatar() {
   const dragStart = useRef<{ offsetX: number; offsetY: number; screenX: number; screenY: number } | null>(null);
   const hasMoved = useRef(false);
   const livelyRef = useRef<LivelyAvatarHandle>(null);
+  const postureTimer = usePostureTimer();
 
   useEffect(() => {
     let active = true;
@@ -62,10 +65,13 @@ export function DesktopAvatar() {
   if (!settings) return null;
 
   const character = characters.find((item) => item.id === settings.characterId) ?? characters[0];
+  // Space for the countdown is kept while the timer is on, so the friend doesn't jump between phases.
+  const hasTimerSpace = settings.showTimer && settings.autoPosture;
 
   return (
     <div
-      className={`desktop-avatar${isDragging ? ' desktop-avatar-dragging' : ''}`}
+      className={`desktop-avatar${isDragging ? ' desktop-avatar-dragging' : ''}${hasTimerSpace ? ' desktop-avatar-with-timer' : ''}`}
+      style={characterThemeStyle(character.id)}
       title={`${character.name} · drag to move, double-click to open, right-click for options`}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -77,6 +83,9 @@ export function DesktopAvatar() {
         window.desktopFriends.avatar.showContextMenu();
       }}
     >
+      {hasTimerSpace && (
+        <PostureCountdown timer={postureTimer} canTakeBreaks={hasGesture(character.id, 'leave')} />
+      )}
       {character.gestures ? (
         <LivelyAvatar
           ref={livelyRef}

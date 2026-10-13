@@ -1,8 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { choosePosture, defaultPostureSchedule, isIdleMinutes, isLateNight, isTimeOfDay } from '../src/shared/posture';
+import {
+  choosePosture,
+  defaultPostureSchedule,
+  formatDuration,
+  isDuration,
+  isLateNight,
+  isTimeOfDay,
+  parseDuration,
+  postureTimeline,
+} from '../src/shared/posture';
 
 const at = (time: string) => new Date(`2026-10-12T${time}:00`);
 const minutesAgo = (now: Date, minutes: number) => now.getTime() - minutes * 60_000;
+const secondsAgo = (now: Date, seconds: number) => now.getTime() - seconds * 1000;
 
 describe('isLateNight', () => {
   it('handles a bedtime window that wraps past midnight', () => {
@@ -53,11 +63,24 @@ describe('validation', () => {
     expect(isTimeOfDay('7:05')).toBe(false);
   });
 
-  it('accepts only whole idle minutes in range', () => {
-    expect(isIdleMinutes(5)).toBe(true);
-    expect(isIdleMinutes(0)).toBe(false);
-    expect(isIdleMinutes(2.5)).toBe(false);
-    expect(isIdleMinutes(241)).toBe(false);
+  it('accepts only whole seconds within each duration range', () => {
+    expect(isDuration('idleSeconds', 5)).toBe(true);
+    expect(isDuration('idleSeconds', 4)).toBe(false);
+    expect(isDuration('idleSeconds', 2.5)).toBe(false);
+    expect(isDuration('studySeconds', 4 * 60 * 60)).toBe(true);
+    expect(isDuration('breakSeconds', 60 * 60 + 1)).toBe(false);
+  });
+
+  it('formats and parses m:ss durations', () => {
+    expect(formatDuration(75)).toBe('1:15');
+    expect(formatDuration(5)).toBe('0:05');
+    expect(formatDuration(3725)).toBe('1:02:05');
+    expect(parseDuration('1:15')).toBe(75);
+    expect(parseDuration('0:45')).toBe(45);
+    expect(parseDuration('1:02:05')).toBe(3725);
+    expect(parseDuration('25')).toBe(25 * 60);
+    expect(parseDuration('1:75')).toBeNull();
+    expect(parseDuration('abc')).toBeNull();
   });
 });
 
@@ -80,5 +103,39 @@ describe('choosePosture with breaks', () => {
   it('sleeps instead of taking breaks late at night', () => {
     const lateNight = at('01:00');
     expect(choosePosture(lateNight, minutesAgo(lateNight, 26), defaultPostureSchedule, true)).toBe('sleeping');
+  });
+});
+
+describe('postureTimeline', () => {
+  const at2pm = at('14:00');
+
+  it('ends the waving phase exactly when the friend settles down', () => {
+    const last = secondsAgo(at2pm, 10);
+    expect(postureTimeline(at2pm, last, defaultPostureSchedule, true)).toEqual({
+      posture: 'waving',
+      endsAt: last + defaultPostureSchedule.idleSeconds * 1000,
+    });
+  });
+
+  it('counts a focus session and a break down to the second', () => {
+    const schedule = { ...defaultPostureSchedule, idleSeconds: 30, studySeconds: 90, breakSeconds: 45 };
+    // 30s waving, then 100s in: 70s into the 90s session.
+    const studying = postureTimeline(at2pm, secondsAgo(at2pm, 100), schedule, true);
+    expect(studying).toEqual({ posture: 'studying', endsAt: at2pm.getTime() + 20_000 });
+    // 125s in: 5s into the 45s break.
+    const away = postureTimeline(at2pm, secondsAgo(at2pm, 125), schedule, true);
+    expect(away).toEqual({ posture: 'away', endsAt: at2pm.getTime() + 40_000 });
+  });
+
+  it('stops a session at bedtime', () => {
+    const almostBed = new Date('2026-10-12T22:59:50');
+    const timeline = postureTimeline(almostBed, minutesAgo(almostBed, 10), defaultPostureSchedule, true);
+    expect(timeline.endsAt).toBe(new Date('2026-10-12T23:00:00').getTime());
+  });
+
+  it('sleeps until wake time', () => {
+    const night = at('01:00');
+    const timeline = postureTimeline(night, minutesAgo(night, 30), defaultPostureSchedule, true);
+    expect(timeline).toEqual({ posture: 'sleeping', endsAt: at('07:00').getTime() });
   });
 });

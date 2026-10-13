@@ -3,10 +3,18 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { isActivity, isCharacterId } from '../shared/characters';
 import { defaultCompanionSettings as defaultSettings } from '../shared/companionSettings';
-import { isAwayMinutes, isIdleMinutes, isTimeOfDay } from '../shared/posture';
+import { isDuration, isTimeOfDay, type DurationField } from '../shared/posture';
 import type { CompanionSettings } from '../shared/types';
 
 const settingsPath = () => path.join(app.getPath('userData'), 'companion-settings.json');
+
+/** Reads a duration in seconds, or converts the minutes field older versions saved. */
+const readDuration = (stored: Record<string, unknown>, field: DurationField, legacyMinutesField: string): number => {
+  if (isDuration(field, stored[field])) return stored[field];
+  const legacy = stored[legacyMinutesField];
+  if (typeof legacy === 'number' && isDuration(field, legacy * 60)) return legacy * 60;
+  return defaultSettings[field];
+};
 
 const isPosition = (value: unknown): value is { x: number; y: number } =>
   typeof value === 'object' && value !== null
@@ -20,11 +28,12 @@ export const loadSettings = (): CompanionSettings => {
       characterId: isCharacterId(stored.characterId) ? stored.characterId : defaultSettings.characterId,
       activity: isActivity(stored.activity) ? stored.activity : defaultSettings.activity,
       autoPosture: typeof stored.autoPosture === 'boolean' ? stored.autoPosture : defaultSettings.autoPosture,
-      idleMinutes: isIdleMinutes(stored.idleMinutes) ? stored.idleMinutes : defaultSettings.idleMinutes,
+      idleSeconds: readDuration(stored, 'idleSeconds', 'idleMinutes'),
       bedtime: isTimeOfDay(stored.bedtime) ? stored.bedtime : defaultSettings.bedtime,
       wakeTime: isTimeOfDay(stored.wakeTime) ? stored.wakeTime : defaultSettings.wakeTime,
-      leaveAfterMinutes: isIdleMinutes(stored.leaveAfterMinutes) ? stored.leaveAfterMinutes : defaultSettings.leaveAfterMinutes,
-      awayMinutes: isAwayMinutes(stored.awayMinutes) ? stored.awayMinutes : defaultSettings.awayMinutes,
+      studySeconds: readDuration(stored, 'studySeconds', 'leaveAfterMinutes'),
+      breakSeconds: readDuration(stored, 'breakSeconds', 'awayMinutes'),
+      showTimer: typeof stored.showTimer === 'boolean' ? stored.showTimer : defaultSettings.showTimer,
       avatarVisible: typeof stored.avatarVisible === 'boolean' ? stored.avatarVisible : defaultSettings.avatarVisible,
       alwaysOnTop: typeof stored.alwaysOnTop === 'boolean' ? stored.alwaysOnTop : defaultSettings.alwaysOnTop,
       hideInFullscreen: typeof stored.hideInFullscreen === 'boolean' ? stored.hideInFullscreen : defaultSettings.hideInFullscreen,

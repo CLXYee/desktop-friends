@@ -32,13 +32,16 @@ export interface CompanionSettings {
   activity: Posture;
   /** When on, the friend picks its own posture: waving, then studying, or sleeping late at night. */
   autoPosture: boolean;
-  idleMinutes: number;
+  /** Seconds without interaction before the friend settles down. */
+  idleSeconds: number;
   bedtime: string;
   wakeTime: string;
-  /** Minutes of studying before a character with the "leave" gesture takes a break. */
-  leaveAfterMinutes: number;
-  /** How long that break lasts. */
-  awayMinutes: number;
+  /** Seconds of one focus session before a character with the "leave" gesture takes a break. */
+  studySeconds: number;
+  /** How long that break lasts, in seconds. */
+  breakSeconds: number;
+  /** Show a countdown of the current phase above the friend. */
+  showTimer: boolean;
   avatarVisible: boolean;
   alwaysOnTop: boolean;
   hideInFullscreen: boolean;
@@ -48,6 +51,12 @@ export interface CompanionSettings {
 
 export type CompanionSettingsUpdate = Partial<Pick<
   CompanionSettings,
-  | 'characterId' | 'autoPosture' | 'idleMinutes' | 'bedtime' | 'wakeTime' | 'leaveAfterMinutes' | 'awayMinutes'
-  | 'avatarVisible' | 'alwaysOnTop' | 'hideInFullscreen'
+  | 'characterId' | 'autoPosture' | 'idleSeconds' | 'bedtime' | 'wakeTime' | 'studySeconds' | 'breakSeconds'
+  | 'showTimer' | 'avatarVisible' | 'alwaysOnTop' | 'hideInFullscreen'
 >> & { activity?: Activity };
+
+/** The automatic posture and when it is due to change (null when the posture is pinned). */
+export interface PostureTimer {
+  posture: Posture;
+  endsAt: number | null;
+}

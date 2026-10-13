@@ -6,6 +6,7 @@ export const defaultCompanionSettings: CompanionSettings = {
   activity: 'waving',
   autoPosture: true,
   ...defaultPostureSchedule,
+  showTimer: true,
   avatarVisible: true,
   alwaysOnTop: true,
   hideInFullscreen: true,

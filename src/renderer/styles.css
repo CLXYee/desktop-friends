@@ -210,7 +210,10 @@ h2 { margin-top: 10px; font-size: 27px; }
 .routine-detail { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 5px; margin-top: 3px; color: var(--muted); font-size: 11px; line-height: 1.45; }
 .routine-input { height: 25px; padding: 0 6px; border: 1px solid var(--friend-tint); border-radius: 8px; background: #fff; color: var(--ink); font: inherit; font-size: 11px; }
 .routine-input:focus-visible { outline: 2px solid var(--friend-main); outline-offset: 1px; }
-.routine-input-minutes { width: 50px; text-align: center; }
+.routine-input-duration { width: 58px; text-align: center; font-variant-numeric: tabular-nums; }
+.routine-input-invalid { border-color: #d98b7a; background: #fff6f3; }
+.routine-timer-toggle { display: flex; align-items: center; gap: 8px; margin: 10px 4px 0; color: var(--muted); font-size: 11px; }
+.routine-timer-toggle input { accent-color: var(--friend-accent); }
 .routine-time-range { display: flex; flex-basis: 100%; align-items: center; gap: 6px; margin-top: 2px; }
 
 .routine-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; padding: 0 4px; color: var(--muted); font-size: 10.5px; line-height: 1.4; }
@@ -226,6 +229,52 @@ html.avatar-mode body { min-width: 0; min-height: 0; }
 .desktop-avatar { position: fixed; inset: 0; cursor: grab; user-select: none; -webkit-user-select: none; }
 .desktop-avatar-dragging { cursor: grabbing; }
 .desktop-avatar-canvas { position: absolute; inset: 0; }
+.desktop-avatar-with-timer .desktop-avatar-canvas { top: 30px; }
+
+/* Countdown bubble above the friend: "📚 24:13" until the break, "☕ 2:59" until back. */
+.posture-countdown {
+  position: absolute;
+  z-index: 3;
+  top: 4px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px 3px 8px;
+  transform: translateX(-50%);
+  border: 1.5px solid var(--friend-main, #e8c783);
+  border-radius: 999px;
+  background: #fffdf8;
+  box-shadow: 0 3px 10px -4px rgb(0 0 0 / 35%);
+  color: var(--friend-accent, #426b50);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.posture-countdown::after {
+  position: absolute;
+  bottom: -5px;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  transform: translateX(-50%) rotate(45deg);
+  border-right: 1.5px solid var(--friend-main, #e8c783);
+  border-bottom: 1.5px solid var(--friend-main, #e8c783);
+  background: #fffdf8;
+  content: '';
+}
+.posture-countdown-time { font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+.posture-countdown-ending { animation: countdown-pulse 1s ease-in-out infinite; }
+.posture-countdown-preview { top: 10px; }
+@keyframes countdown-pulse {
+  0%, 100% { transform: translateX(-50%) scale(1); }
+  50% { transform: translateX(-50%) scale(1.08); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .posture-countdown-ending { animation: none; }
+}
 .desktop-avatar-canvas canvas { display: block; width: 100%; height: 100%; }
 .desktop-avatar .preview-error {
   padding: 8px 10px;
