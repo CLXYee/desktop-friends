@@ -4,6 +4,8 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   root: 'src/renderer',
   publicDir: '../../public',
+  // .env lives in the project root, not in the renderer root above.
+  envDir: '../..',
   base: './',
   plugins: [react()],
   build: {

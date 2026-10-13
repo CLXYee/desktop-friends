@@ -8,6 +8,7 @@ export const defaultCompanionSettings: CompanionSettings = {
   ...defaultPostureSchedule,
   showTimer: true,
   avatarVisible: true,
+  avatarSize: 'medium',
   alwaysOnTop: true,
   hideInFullscreen: true,
   avatarPosition: null,

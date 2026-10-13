@@ -1,6 +1,7 @@
 import { app } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
+import { isAvatarSize } from '../shared/avatarSize';
 import { isActivity, isCharacterId } from '../shared/characters';
 import { defaultCompanionSettings as defaultSettings } from '../shared/companionSettings';
 import { isDuration, isTimeOfDay, type DurationField } from '../shared/posture';
@@ -35,6 +36,7 @@ export const loadSettings = (): CompanionSettings => {
       breakSeconds: readDuration(stored, 'breakSeconds', 'awayMinutes'),
       showTimer: typeof stored.showTimer === 'boolean' ? stored.showTimer : defaultSettings.showTimer,
       avatarVisible: typeof stored.avatarVisible === 'boolean' ? stored.avatarVisible : defaultSettings.avatarVisible,
+      avatarSize: isAvatarSize(stored.avatarSize) ? stored.avatarSize : defaultSettings.avatarSize,
       alwaysOnTop: typeof stored.alwaysOnTop === 'boolean' ? stored.alwaysOnTop : defaultSettings.alwaysOnTop,
       hideInFullscreen: typeof stored.hideInFullscreen === 'boolean' ? stored.hideInFullscreen : defaultSettings.hideInFullscreen,
       avatarPosition: isPosition(stored.avatarPosition) ? stored.avatarPosition : null,

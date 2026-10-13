@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState, type PointerEvent } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
+import { AVATAR_DESIGN_HEIGHT } from '../../../shared/avatarSize';
 import { characters, hasGesture, postureAsActivity } from '../../../shared/characters';
 import type { CompanionSettings } from '../../../shared/types';
 import { characterThemeStyle } from './characterThemes';
+import type { BubbleAnchor } from './bubbleAnchor';
 import { CrystalAnimationPreview } from './CrystalAnimationPreview';
 import { LivelyAvatar, type LivelyAvatarHandle } from './lively/LivelyAvatar';
 import { PostureCountdown, usePostureTimer } from './PostureCountdown';
@@ -14,7 +16,16 @@ export function DesktopAvatar() {
   const dragStart = useRef<{ offsetX: number; offsetY: number; screenX: number; screenY: number } | null>(null);
   const hasMoved = useRef(false);
   const livelyRef = useRef<LivelyAvatarHandle>(null);
+  const [bubbleAnchor, setBubbleAnchor] = useState<BubbleAnchor | null>(null);
   const postureTimer = usePostureTimer();
+  // The window grows with the screen; the timer bubble grows with it.
+  const [scale, setScale] = useState(() => window.innerHeight / AVATAR_DESIGN_HEIGHT);
+
+  useEffect(() => {
+    const update = () => setScale(window.innerHeight / AVATAR_DESIGN_HEIGHT);
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -65,13 +76,12 @@ export function DesktopAvatar() {
   if (!settings) return null;
 
   const character = characters.find((item) => item.id === settings.characterId) ?? characters[0];
-  // Space for the countdown is kept while the timer is on, so the friend doesn't jump between phases.
-  const hasTimerSpace = settings.showTimer && settings.autoPosture;
+  const showsTimer = settings.showTimer && settings.autoPosture;
 
   return (
     <div
-      className={`desktop-avatar${isDragging ? ' desktop-avatar-dragging' : ''}${hasTimerSpace ? ' desktop-avatar-with-timer' : ''}`}
-      style={characterThemeStyle(character.id)}
+      className={`desktop-avatar${isDragging ? ' desktop-avatar-dragging' : ''}`}
+      style={{ ...characterThemeStyle(character.id), '--avatar-scale': scale } as CSSProperties}
       title={`${character.name} · drag to move, double-click to open, right-click for options`}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -83,8 +93,8 @@ export function DesktopAvatar() {
         window.desktopFriends.avatar.showContextMenu();
       }}
     >
-      {hasTimerSpace && (
-        <PostureCountdown timer={postureTimer} canTakeBreaks={hasGesture(character.id, 'leave')} />
+      {showsTimer && (
+        <PostureCountdown timer={postureTimer} canTakeBreaks={hasGesture(character.id, 'leave')} anchor={bubbleAnchor} />
       )}
       {character.gestures ? (
         <LivelyAvatar
@@ -93,6 +103,7 @@ export function DesktopAvatar() {
           displayName={character.name}
           posture={settings.activity}
           className="desktop-avatar-canvas"
+          onBubbleAnchor={setBubbleAnchor}
         />
       ) : (
         <CrystalAnimationPreview
@@ -100,6 +111,7 @@ export function DesktopAvatar() {
           displayName={character.name}
           activity={postureAsActivity(settings.activity)}
           className="desktop-avatar-canvas"
+          onBubbleAnchor={setBubbleAnchor}
         />
       )}
     </div>

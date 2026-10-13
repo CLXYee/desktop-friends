@@ -1,3 +1,5 @@
+import type { AvatarSize } from './avatarSize';
+
 export type Activity = 'waving' | 'studying' | 'sleeping' | 'gaming';
 
 /** What the friend is doing right now: an animation, or out of sight on a break (characters with the "leave" gesture). */
@@ -43,6 +45,8 @@ export interface CompanionSettings {
   /** Show a countdown of the current phase above the friend. */
   showTimer: boolean;
   avatarVisible: boolean;
+  /** How big the friend is, relative to the screen it stands on. */
+  avatarSize: AvatarSize;
   alwaysOnTop: boolean;
   hideInFullscreen: boolean;
   avatarPosition: { x: number; y: number } | null;
@@ -52,7 +56,7 @@ export interface CompanionSettings {
 export type CompanionSettingsUpdate = Partial<Pick<
   CompanionSettings,
   | 'characterId' | 'autoPosture' | 'idleSeconds' | 'bedtime' | 'wakeTime' | 'studySeconds' | 'breakSeconds'
-  | 'showTimer' | 'avatarVisible' | 'alwaysOnTop' | 'hideInFullscreen'
+  | 'showTimer' | 'avatarVisible' | 'avatarSize' | 'alwaysOnTop' | 'hideInFullscreen'
 >> & { activity?: Activity };
 
 /** The automatic posture and when it is due to change (null when the posture is pinned). */

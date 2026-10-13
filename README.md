@@ -34,13 +34,29 @@ The selected friend lives on the desktop in a small transparent window, separate
 
 - Closing the main window hides it; the app keeps running in the system tray (menu bar on macOS). Use **Quit Desktop Friends** in the tray menu to exit.
 - Click the tray icon, double-click the friend, or launch the app again to reopen the main window.
+- The friend is sized relative to the screen it stands on: **Small**, **Medium** (default) or **Large** is 25%, 35% or 50% of that screen's height, set in the app or the tray menu (**Size**). Moving it to another monitor, or changing the resolution, resizes it to match.
 - Drag the friend to move it; its position is remembered. Right-click it (or the tray icon) to change character or animation, hide it, toggle always-on-top, or move it back to the corner.
 - With **Automatic** posture (the default), the friend waves when the app opens or when you touch it, studies after being left alone for a while (5:00 by default), and sleeps instead between bedtime and wake-up (23:00–07:00 by default). Durations are set to the second (`m:ss`) under **Friend behavior** in the app, and each phase switches exactly when its time is up. A countdown bubble above the friend shows the time left in the current phase (turn it off in the app or the tray menu). Pick a specific animation to pin it instead.
 - Starry is livelier than the others. After each focus session (20:00 by default) she waves goodbye, hops out through a door that slams behind her, and comes back after a short break (3:00 by default). Clicking her makes her jump in a burst of stars. Her gesture art slots are described in `art-source/starry/NEW-ANIMATIONS.md`.
 - On Windows, the friend hides while a fullscreen game, video, or presentation is in front on its monitor, and comes back afterwards (tray menu: **Hide during fullscreen games and videos**). This uses [koffi](https://koffi.dev/) to query Windows; its install script is intentionally not allowed because the prebuilt binary comes from `@koromix/koffi-win32-x64`.
-- Packaged builds can start at login from the tray menu; they start hidden with only the friend and tray icon.
+- Packaged builds can start at login from the tray menu; they start hidden with only the friend and tray icon (the friend appears only if a remembered sign-in exists).
 
 Companion settings are stored in `companion-settings.json` in Electron's `userData` folder.
+
+## Accounts
+
+The main window opens on a **Log in / Sign up** page, greeted by a random friend that changes every minute; the app's content, and the friend on the desktop, appear once someone is signed in. Logging out removes the friend from the desktop again.
+
+- Accounts use **Supabase Auth**. People sign in with a **username** (3–20 lowercase letters, numbers or underscores) and password. Supabase identifies accounts by email, so the app maps each username to an internal address on the project's own Supabase domain (`<username>@<project>.supabase.co`). No mail is ever sent to it.
+- Passwords need at least 8 characters with an uppercase letter, a lowercase letter, a number and a symbol; the sign-up form checks this live.
+- **Remember me** keeps the session in an encrypted file (`auth-session.bin` in the `userData` folder, protected by the operating system via Electron `safeStorage`), so the next launch signs in automatically. Without it, the session lasts until the app quits.
+- **Log out** (top-right of the main page) ends the session with Supabase and deletes the remembered session.
+- User data lives in `public.profiles` (username, display name, role, timestamps), created automatically on sign-up. Row-level security lets people read and rename only their own profile; admins can read every profile. The role can only be changed in the database. The schema is in `supabase/migrations/`.
+
+Supabase project settings this relies on:
+
+- **Authentication → Sign In / Providers → Email → Confirm email: off**, otherwise sign-up waits for an email nobody receives.
+- Recommended: **Authentication → Policies (password requirements)**: minimum length 8 and "lowercase, uppercase letters, digits and symbols", so the server enforces the same rule as the form.
 
 ## Avatar artwork
 

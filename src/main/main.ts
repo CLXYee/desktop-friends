@@ -1,14 +1,14 @@
 import { app, BrowserWindow, ipcMain, Menu, powerMonitor, screen, Tray, type MenuItemConstructorOptions } from 'electron';
 import path from 'node:path';
+import { avatarDimensions, avatarSizes, isAvatarSize } from '../shared/avatarSize';
 import { activities, characters, hasGesture, isActivity, isCharacterId } from '../shared/characters';
 import { isDuration, isTimeOfDay, postureTimeline } from '../shared/posture';
 import type { CompanionSettings, CompanionSettingsUpdate, PostureTimer } from '../shared/types';
+import { canRememberSession, clearRememberedSession, readRememberedSession, writeRememberedSession } from './authStore';
 import { watchFullscreen } from './fullscreenWatcher';
 import { loadSettings, saveSettings } from './settings';
 import { createTrayIcon, createWindowIcon } from './trayIcon';
 
-const AVATAR_WIDTH = 180;
-const AVATAR_HEIGHT = 240;
 const AVATAR_SCREEN_MARGIN = 24;
 // On Windows, Electron's default "floating" level parks the window just behind the taskbar. While a
 // fullscreen app is active the taskbar is not topmost, so the avatar silently loses its topmost flag
@@ -20,11 +20,15 @@ const POSTURE_SAFETY_CHECK_MS = 30_000;
 
 let mainWindow: BrowserWindow | null = null;
 let avatarWindow: BrowserWindow | null = null;
+// The avatar window's size: a share of the screen the friend stands on (see shared/avatarSize).
+let avatarSize = { width: 0, height: 0 };
 let tray: Tray | null = null;
 let settings: CompanionSettings;
 let isQuitting = false;
 let isFullscreenAppActive = false;
 let canDetectFullscreen = false;
+// The friend only appears on the desktop while someone is logged in (reported by the main window).
+let isSignedIn = false;
 // Opening the app counts as an interaction, so the friend starts out waving.
 let lastInteractionAt = Date.now();
 let postureTimer: PostureTimer = { posture: 'waving', endsAt: null };
@@ -65,6 +69,7 @@ const updateSettings = (patch: Partial<CompanionSettings>): void => {
   if (settings.avatarVisible !== previous.avatarVisible || settings.hideInFullscreen !== previous.hideInFullscreen) {
     syncAvatarVisibility();
   }
+  if (settings.avatarSize !== previous.avatarSize) fitAvatarToScreen();
 
   for (const window of [mainWindow, avatarWindow]) {
     if (window && !window.isDestroyed()) window.webContents.send('settings:changed', settings);
@@ -128,35 +133,35 @@ const revealWindow = (window: BrowserWindow): void => {
   window.focus();
 };
 
+const createMainWindow = (reveal: boolean): void => {
+  mainWindow = new BrowserWindow({
+    width: 1120,
+    height: 760,
+    minWidth: 760,
+    minHeight: 560,
+    title: 'Desktop Friends',
+    backgroundColor: '#f5f4ee',
+    icon: createWindowIcon(settings.characterId),
+    show: false,
+    webPreferences,
+  });
+
+  mainWindow.on('close', (event) => {
+    if (isQuitting) return;
+    event.preventDefault();
+    mainWindow?.hide();
+    showTrayHintOnce();
+  });
+  mainWindow.on('closed', () => { mainWindow = null; });
+  mainWindow.once('ready-to-show', () => {
+    if (reveal && mainWindow) revealWindow(mainWindow);
+  });
+  loadRenderer(mainWindow);
+};
+
 const showMainWindow = (): void => {
-  if (!mainWindow || mainWindow.isDestroyed()) {
-    mainWindow = new BrowserWindow({
-      width: 1120,
-      height: 760,
-      minWidth: 760,
-      minHeight: 560,
-      title: 'Desktop Friends',
-      backgroundColor: '#f5f4ee',
-      icon: createWindowIcon(settings.characterId),
-      show: false,
-      webPreferences,
-    });
-
-    mainWindow.on('close', (event) => {
-      if (isQuitting) return;
-      event.preventDefault();
-      mainWindow?.hide();
-      showTrayHintOnce();
-    });
-    mainWindow.on('closed', () => { mainWindow = null; });
-    mainWindow.once('ready-to-show', () => {
-      if (mainWindow) revealWindow(mainWindow);
-    });
-    loadRenderer(mainWindow);
-    return;
-  }
-
-  revealWindow(mainWindow);
+  if (!mainWindow || mainWindow.isDestroyed()) createMainWindow(true);
+  else revealWindow(mainWindow);
 };
 
 const showTrayHintOnce = (): void => {
@@ -173,35 +178,68 @@ const showTrayHintOnce = (): void => {
 // Avatar window: a small transparent, frameless window that lives on the desktop.
 // ---------------------------------------------------------------------------
 
-const defaultAvatarPosition = (): { x: number; y: number } => {
-  const { workArea } = screen.getPrimaryDisplay();
+const sizeOnDisplay = (display: Electron.Display): { width: number; height: number } =>
+  avatarDimensions(display.workArea, settings.avatarSize);
+
+const defaultAvatarBounds = (): Electron.Rectangle => {
+  const display = screen.getPrimaryDisplay();
+  const { workArea } = display;
+  const size = sizeOnDisplay(display);
   return {
-    x: workArea.x + workArea.width - AVATAR_WIDTH - AVATAR_SCREEN_MARGIN,
-    y: workArea.y + workArea.height - AVATAR_HEIGHT,
+    x: workArea.x + workArea.width - size.width - AVATAR_SCREEN_MARGIN,
+    y: workArea.y + workArea.height - size.height,
+    ...size,
   };
 };
 
-// Falls back to the default corner when the saved spot is on a monitor that is no longer attached.
-const resolveAvatarPosition = (): { x: number; y: number } => {
-  const saved = settings.avatarPosition;
-  if (!saved) return defaultAvatarPosition();
+const clampToWorkArea = (bounds: Electron.Rectangle, workArea: Electron.Rectangle): Electron.Rectangle => ({
+  ...bounds,
+  x: Math.min(Math.max(bounds.x, workArea.x), workArea.x + workArea.width - bounds.width),
+  y: Math.min(Math.max(bounds.y, workArea.y), workArea.y + workArea.height - bounds.height),
+});
 
-  const centerX = saved.x + AVATAR_WIDTH / 2;
-  const centerY = saved.y + AVATAR_HEIGHT / 2;
-  const isVisible = screen.getAllDisplays().some(({ workArea }) => (
-    centerX >= workArea.x && centerX <= workArea.x + workArea.width
-    && centerY >= workArea.y && centerY <= workArea.y + workArea.height
-  ));
-  return isVisible ? saved : defaultAvatarPosition();
+// Falls back to the default corner when the saved spot is on a monitor that is no longer attached.
+const resolveAvatarBounds = (): Electron.Rectangle => {
+  const saved = settings.avatarPosition;
+  if (!saved) return defaultAvatarBounds();
+
+  const display = screen.getDisplayNearestPoint(saved);
+  const size = sizeOnDisplay(display);
+  const { workArea } = display;
+  const centerX = saved.x + size.width / 2;
+  const centerY = saved.y + size.height / 2;
+  const isVisible = centerX >= workArea.x && centerX <= workArea.x + workArea.width
+    && centerY >= workArea.y && centerY <= workArea.y + workArea.height;
+  return isVisible ? clampToWorkArea({ ...saved, ...size }, workArea) : defaultAvatarBounds();
+};
+
+/**
+ * Resizes the friend for the screen it stands on, keeping its feet in the same spot. Runs when the
+ * size setting or a screen changes, and after the friend is dragged onto another monitor.
+ */
+const fitAvatarToScreen = (): void => {
+  if (!avatarWindow || avatarWindow.isDestroyed()) return;
+  const current = avatarWindow.getBounds();
+  const display = screen.getDisplayMatching(current);
+  const size = sizeOnDisplay(display);
+  if (size.width === avatarSize.width && size.height === avatarSize.height) return;
+
+  const feetX = current.x + current.width / 2;
+  const feetY = current.y + current.height;
+  const bounds = clampToWorkArea(
+    { x: Math.round(feetX - size.width / 2), y: Math.round(feetY - size.height), ...size },
+    display.workArea,
+  );
+  avatarSize = size;
+  avatarWindow.setBounds(bounds);
+  updateSettings({ avatarPosition: { x: bounds.x, y: bounds.y } });
 };
 
 const createAvatarWindow = (): BrowserWindow => {
-  const { x, y } = resolveAvatarPosition();
+  const bounds = resolveAvatarBounds();
+  avatarSize = { width: bounds.width, height: bounds.height };
   const window = new BrowserWindow({
-    x,
-    y,
-    width: AVATAR_WIDTH,
-    height: AVATAR_HEIGHT,
+    ...bounds,
     title: 'Desktop Friends avatar',
     transparent: true,
     backgroundColor: '#00000000',
@@ -244,9 +282,15 @@ const keepAvatarOnTop = (): void => {
 };
 
 const shouldShowAvatar = (): boolean =>
-  settings.avatarVisible && !(settings.hideInFullscreen && isFullscreenAppActive);
+  isSignedIn && settings.avatarVisible && !(settings.hideInFullscreen && isFullscreenAppActive);
 
 const syncAvatarVisibility = (): void => {
+  if (!isSignedIn) {
+    // Nobody is logged in: no friend on the desktop at all until someone logs in.
+    if (avatarWindow && !avatarWindow.isDestroyed()) avatarWindow.destroy();
+    avatarWindow = null;
+    return;
+  }
   if (!avatarWindow || avatarWindow.isDestroyed()) {
     // The window is created even while it should stay hidden: fullscreen detection needs its monitor.
     if (settings.avatarVisible) avatarWindow = createAvatarWindow();
@@ -257,9 +301,19 @@ const syncAvatarVisibility = (): void => {
 };
 
 const resetAvatarPosition = (): void => {
-  const position = defaultAvatarPosition();
-  avatarWindow?.setBounds({ ...position, width: AVATAR_WIDTH, height: AVATAR_HEIGHT });
+  const bounds = defaultAvatarBounds();
+  avatarSize = { width: bounds.width, height: bounds.height };
+  avatarWindow?.setBounds(bounds);
   updateSettings({ avatarPosition: null, avatarVisible: true });
+};
+
+const setSignedIn = (signedIn: boolean): void => {
+  if (signedIn === isSignedIn) return;
+  isSignedIn = signedIn;
+  // Logging in counts as an interaction, so the friend arrives waving.
+  if (signedIn) registerInteraction();
+  syncAvatarVisibility();
+  refreshTrayMenu();
 };
 
 // ---------------------------------------------------------------------------
@@ -269,11 +323,12 @@ const resetAvatarPosition = (): void => {
 const canLaunchAtLogin = (): boolean => app.isPackaged && process.platform !== 'linux';
 
 const buildMenuTemplate = (): MenuItemConstructorOptions[] => [
-  { label: 'Open Desktop Friends', click: showMainWindow },
+  { label: isSignedIn ? 'Open Desktop Friends' : 'Log in to Desktop Friends', click: showMainWindow },
   { type: 'separator' },
   {
     label: 'Show friend on desktop',
     type: 'checkbox',
+    enabled: isSignedIn,
     checked: settings.avatarVisible,
     click: (item) => updateSettings({ avatarVisible: item.checked }),
   },
@@ -282,6 +337,15 @@ const buildMenuTemplate = (): MenuItemConstructorOptions[] => [
     type: 'checkbox',
     checked: settings.showTimer,
     click: (item) => updateSettings({ showTimer: item.checked }),
+  },
+  {
+    label: 'Size',
+    submenu: avatarSizes.map((size): MenuItemConstructorOptions => ({
+      label: size.label,
+      type: 'radio',
+      checked: settings.avatarSize === size.value,
+      click: () => updateSettings({ avatarSize: size.value }),
+    })),
   },
   {
     label: 'Keep on top of other windows',
@@ -322,7 +386,7 @@ const buildMenuTemplate = (): MenuItemConstructorOptions[] => [
       })),
     ],
   },
-  { label: 'Move friend back to corner', click: resetAvatarPosition },
+  { label: 'Move friend back to corner', enabled: isSignedIn, click: resetAvatarPosition },
   { type: 'separator' },
   {
     label: process.platform === 'darwin' ? 'Open at login' : 'Start with Windows',
@@ -368,6 +432,7 @@ const registerIpc = (): void => {
     if (isDuration('breakSeconds', patch.breakSeconds)) accepted.breakSeconds = patch.breakSeconds;
     if (typeof patch.showTimer === 'boolean') accepted.showTimer = patch.showTimer;
     if (typeof patch.avatarVisible === 'boolean') accepted.avatarVisible = patch.avatarVisible;
+    if (isAvatarSize(patch.avatarSize)) accepted.avatarSize = patch.avatarSize;
     if (typeof patch.alwaysOnTop === 'boolean') accepted.alwaysOnTop = patch.alwaysOnTop;
     if (typeof patch.hideInFullscreen === 'boolean') accepted.hideInFullscreen = patch.hideInFullscreen;
     updateSettings(accepted);
@@ -377,13 +442,14 @@ const registerIpc = (): void => {
     if (!avatarWindow || event.sender !== avatarWindow.webContents) return;
     if (typeof x !== 'number' || typeof y !== 'number' || !Number.isFinite(x) || !Number.isFinite(y)) return;
     // setBounds instead of setPosition: on Windows with display scaling, setPosition can slowly grow the window.
-    avatarWindow.setBounds({ x: Math.round(x), y: Math.round(y), width: AVATAR_WIDTH, height: AVATAR_HEIGHT });
+    avatarWindow.setBounds({ x: Math.round(x), y: Math.round(y), ...avatarSize });
   });
 
   ipcMain.on('avatar:drag-end', (event) => {
     if (!avatarWindow || event.sender !== avatarWindow.webContents) return;
     const [x, y] = avatarWindow.getPosition();
     updateSettings({ avatarPosition: { x, y } });
+    fitAvatarToScreen();
   });
 
   // Touching the friend on the desktop or in the app's preview.
@@ -395,6 +461,21 @@ const registerIpc = (): void => {
   });
 
   ipcMain.on('app:open-main-window', showMainWindow);
+
+  // Remembered sign-in: only the main window (where accounts live) may touch it.
+  const fromMainWindow = (event: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent) =>
+    Boolean(mainWindow && !mainWindow.isDestroyed() && event.sender === mainWindow.webContents);
+  ipcMain.handle('auth-store:can-remember', () => canRememberSession());
+  ipcMain.handle('auth-store:read', (event) => (fromMainWindow(event) ? readRememberedSession() : null));
+  ipcMain.on('auth-store:write', (event, items: unknown) => {
+    if (fromMainWindow(event)) writeRememberedSession(items);
+  });
+  ipcMain.on('auth-store:clear', (event) => {
+    if (fromMainWindow(event)) clearRememberedSession();
+  });
+  ipcMain.on('account:signed-in', (event, signedIn: unknown) => {
+    if (fromMainWindow(event) && typeof signedIn === 'boolean') setSignedIn(signedIn);
+  });
 };
 
 // ---------------------------------------------------------------------------
@@ -420,8 +501,13 @@ if (!app.requestSingleInstanceLock()) {
     });
     createTray();
     keepAvatarOnTop();
-    syncAvatarVisibility();
+    screen.on('display-metrics-changed', fitAvatarToScreen);
+    screen.on('display-added', fitAvatarToScreen);
+    screen.on('display-removed', fitAvatarToScreen);
+    // The friend appears once the main window reports a signed-in account. Started with Windows, a
+    // remembered sign-in is restored in a hidden main window so the friend still shows up on its own.
     if (!startHidden) showMainWindow();
+    else if (readRememberedSession()) createMainWindow(false);
 
     app.on('activate', showMainWindow);
   });

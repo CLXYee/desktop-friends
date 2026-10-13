@@ -1,6 +1,7 @@
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react';
 import 'pixi.js/unsafe-eval';
 import type { Posture } from '../../../../shared/types';
+import type { BubbleAnchor } from '../bubbleAnchor';
 import { LivelyScene } from './livelyScene';
 
 export interface LivelyAvatarHandle {
@@ -12,14 +13,25 @@ interface LivelyAvatarProps {
   displayName: string;
   posture: Posture;
   className?: string;
+  /** Reports the spot just above the character's head (or its door while away), for the countdown bubble. */
+  onBubbleAnchor?: (anchor: BubbleAnchor) => void;
   ref?: Ref<LivelyAvatarHandle>;
 }
 
 /** Avatar for characters with gestures (see `characters.ts`); others use CrystalAnimationPreview. */
-export function LivelyAvatar({ characterId, displayName, posture, className = 'avatar-preview-canvas', ref }: LivelyAvatarProps) {
+export function LivelyAvatar({
+  characterId,
+  displayName,
+  posture,
+  className = 'avatar-preview-canvas',
+  onBubbleAnchor,
+  ref,
+}: LivelyAvatarProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<LivelyScene | null>(null);
   const postureRef = useRef(posture);
+  const onBubbleAnchorRef = useRef(onBubbleAnchor);
+  onBubbleAnchorRef.current = onBubbleAnchor;
   const [error, setError] = useState(false);
 
   useEffect(() => {
@@ -36,6 +48,7 @@ export function LivelyAvatar({ characterId, displayName, posture, className = 'a
         return;
       }
       sceneRef.current = scene;
+      scene.onBubbleAnchor = (anchor) => onBubbleAnchorRef.current?.(anchor);
       scene.setPosture(postureRef.current);
       resizeObserver = new ResizeObserver(() => scene.resize());
       resizeObserver.observe(container);

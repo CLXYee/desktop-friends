@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { formatDuration } from '../../../shared/posture';
 import type { Posture, PostureTimer } from '../../../shared/types';
+import type { BubbleAnchor } from './bubbleAnchor';
 
 const ENDING_SOON_SECONDS = 10;
 
@@ -33,11 +34,12 @@ interface PostureCountdownProps {
   timer: PostureTimer | null;
   /** Without breaks, studying lasts until bedtime, which isn't a focus countdown. */
   canTakeBreaks: boolean;
-  className?: string;
+  /** The spot just above the character's head, reported by its avatar; nothing shows until it is known. */
+  anchor: BubbleAnchor | null;
 }
 
 /** A small bubble that counts down the current phase, e.g. "📚 24:13" until the next break. */
-export function PostureCountdown({ timer, canTakeBreaks, className = '' }: PostureCountdownProps) {
+export function PostureCountdown({ timer, canTakeBreaks, anchor }: PostureCountdownProps) {
   const [now, setNow] = useState(() => Date.now());
   const endsAt = timer?.endsAt ?? null;
 
@@ -55,18 +57,23 @@ export function PostureCountdown({ timer, canTakeBreaks, className = '' }: Postu
   }, [endsAt]);
 
   const phase = timer && phases[timer.posture];
-  if (!timer || endsAt === null || !phase || (timer.posture === 'studying' && !canTakeBreaks)) return null;
+  if (!anchor || !timer || endsAt === null || !phase || (timer.posture === 'studying' && !canTakeBreaks)) return null;
 
   const remaining = Math.max(0, Math.ceil((endsAt - now) / 1000));
   const isEnding = remaining <= ENDING_SOON_SECONDS;
   return (
     <div
-      className={`posture-countdown${isEnding ? ' posture-countdown-ending' : ''} ${className}`}
-      role="timer"
-      aria-label={`${formatDuration(remaining)} ${phase.label}`}
+      className="posture-countdown-anchor"
+      style={{ '--anchor-x': `${anchor.x}px`, '--anchor-y': `${anchor.y}px` } as CSSProperties}
     >
-      <span aria-hidden="true">{phase.icon}</span>
-      <span className="posture-countdown-time">{formatDuration(remaining)}</span>
+      <div
+        className={`posture-countdown${isEnding ? ' posture-countdown-ending' : ''}`}
+        role="timer"
+        aria-label={`${formatDuration(remaining)} ${phase.label}`}
+      >
+        <span aria-hidden="true">{phase.icon}</span>
+        <span className="posture-countdown-time">{formatDuration(remaining)}</span>
+      </div>
     </div>
   );
 }

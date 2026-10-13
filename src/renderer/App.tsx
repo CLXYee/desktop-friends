@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
+import { avatarSizes, type AvatarSize } from '../shared/avatarSize';
 import { activities, characters, hasGesture, postureAsActivity, postureLabel } from '../shared/characters';
 import { defaultCompanionSettings } from '../shared/companionSettings';
 import type { Activity, CompanionSettings, CompanionSettingsUpdate } from '../shared/types';
+import type { BubbleAnchor } from './features/pets/bubbleAnchor';
 import { CrystalAnimationPreview } from './features/pets/CrystalAnimationPreview';
+import { useAccount } from './features/auth/account';
 import { characterThemeStyle } from './features/pets/characterThemes';
 import { LivelyAvatar, type LivelyAvatarHandle } from './features/pets/lively/LivelyAvatar';
 import { PostureCountdown, usePostureTimer } from './features/pets/PostureCountdown';
@@ -16,6 +19,9 @@ export function App() {
   const character = characters.find((item) => item.id === characterId) ?? characters[0];
   const activityLabel = postureLabel(activity).toLowerCase();
   const livelyRef = useRef<LivelyAvatarHandle>(null);
+  const [bubbleAnchor, setBubbleAnchor] = useState<BubbleAnchor | null>(null);
+  const { profile, signOut } = useAccount();
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const postureTimer = usePostureTimer();
   const companion: Window['desktopFriends'] | undefined = window.desktopFriends;
 
@@ -60,15 +66,29 @@ export function App() {
         <header className="topbar">
           <div className="breadcrumb">YOUR SPACE <span>/</span> FRIENDS</div>
           <div className="profile-chip">
-            <span className="profile-initial">Y</span>
-            <span>My profile</span>
+            <span className="profile-initial" aria-hidden="true">{profile?.displayName.charAt(0).toUpperCase() ?? '?'}</span>
+            <span className="profile-name">
+              <strong>{profile?.displayName}</strong>
+              <small>@{profile?.username}{profile?.role === 'admin' && <span className="profile-role">Admin</span>}</small>
+            </span>
+            <button
+              className="logout-button"
+              type="button"
+              disabled={isSigningOut}
+              onClick={() => {
+                setIsSigningOut(true);
+                void signOut();
+              }}
+            >
+              {isSigningOut ? 'Logging out…' : 'Log out'}
+            </button>
           </div>
         </header>
 
         <div className="page-content">
           <div className="page-heading">
             <div>
-              <p className="eyebrow">A LITTLE CORNER OF THE INTERNET</p>
+              <p className="eyebrow">WELCOME BACK, {profile?.displayName.toUpperCase()}</p>
               <h1>Friends</h1>
             </div>
             <button className="invite-button" type="button" disabled>
@@ -101,18 +121,25 @@ export function App() {
                   <PostureCountdown
                     timer={postureTimer}
                     canTakeBreaks={hasGesture(character.id, 'leave')}
-                    className="posture-countdown-preview"
+                    anchor={bubbleAnchor}
                   />
                 )}
                 <span className="preview-sun" aria-hidden="true" />
                 <span className="preview-ground" aria-hidden="true" />
                 {character.gestures ? (
-                  <LivelyAvatar ref={livelyRef} characterId={character.id} displayName={character.name} posture={activity} />
+                  <LivelyAvatar
+                    ref={livelyRef}
+                    characterId={character.id}
+                    displayName={character.name}
+                    posture={activity}
+                    onBubbleAnchor={setBubbleAnchor}
+                  />
                 ) : (
                   <CrystalAnimationPreview
                     characterId={character.id}
                     displayName={character.name}
                     activity={postureAsActivity(activity)}
+                    onBubbleAnchor={setBubbleAnchor}
                   />
                 )}
               </div>
@@ -143,6 +170,17 @@ export function App() {
                     {activities.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
                   </select>
                 </label>
+                {companion && (
+                  <label className="activity-picker">
+                    <span>Size</span>
+                    <select
+                      value={settings.avatarSize}
+                      onChange={(event) => updateCompanion({ avatarSize: event.target.value as AvatarSize })}
+                    >
+                      {avatarSizes.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+                    </select>
+                  </label>
+                )}
                 {companion && (
                   <label className="activity-picker">
                     <input

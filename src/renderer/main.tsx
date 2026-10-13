@@ -1,6 +1,8 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
+import { AccountProvider } from './features/auth/account';
+import { AccountGate } from './features/auth/AccountGate';
 import { DesktopAvatar } from './features/pets/DesktopAvatar';
 import './styles.css';
 
@@ -14,6 +16,14 @@ if (isAvatarWindow) document.documentElement.classList.add('avatar-mode');
 
 createRoot(rootElement).render(
   <React.StrictMode>
-    {isAvatarWindow ? <DesktopAvatar /> : <App />}
+    {isAvatarWindow ? (
+      <DesktopAvatar />
+    ) : (
+      <AccountProvider>
+        <AccountGate>
+          <App />
+        </AccountGate>
+      </AccountProvider>
+    )}
   </React.StrictMode>,
 );

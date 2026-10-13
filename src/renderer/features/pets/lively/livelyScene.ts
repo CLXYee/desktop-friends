@@ -1,5 +1,6 @@
 import { AnimatedSprite, Application, Assets, Container, Rectangle, Texture, type Ticker } from 'pixi.js';
 import type { Posture } from '../../../../shared/types';
+import { paintedTop, sameAnchor, type BubbleAnchor } from '../bubbleAnchor';
 import { createBam, createDoor, createPuff, createStar, DOOR_HEIGHT, sparkleColors, type Door } from './livelyProps';
 
 interface AnimationDefinition {
@@ -103,6 +104,10 @@ export class LivelyScene {
   private readonly door: Door = createDoor();
   private readonly sprite: AnimatedSprite;
   private readonly frameCache = new Map<string, Promise<FrameSet | null>>();
+  private readonly paintedTops = new Map<FrameSet, number>();
+  private bubbleAnchor: BubbleAnchor | null = null;
+  /** Called with the spot just above the resting character's head (or the door while away). */
+  onBubbleAnchor: ((anchor: BubbleAnchor) => void) | null = null;
   private tweens: Tween[] = [];
   private particles: Particle[] = [];
 
@@ -183,6 +188,7 @@ export class LivelyScene {
   resize(): void {
     this.app.renderer.resize(Math.max(this.container.clientWidth, 1), Math.max(this.container.clientHeight, 1));
     this.needsRender = true;
+    void this.updateBubbleAnchor();
   }
 
   // -------------------------------------------------------------------------
@@ -196,6 +202,7 @@ export class LivelyScene {
     if ((this.isSequenceRunning || this.isJumping) && previous) this.snapTo(previous);
     this.cancelAll();
     this.posture = next;
+    void this.updateBubbleAnchor();
 
     if (previous === null) {
       this.snapTo(next);
@@ -464,6 +471,30 @@ export class LivelyScene {
         resolve();
       };
     });
+  }
+
+  // Where the resting pose's head is (jumps and walks don't move it), or the top of the door while away.
+  private async updateBubbleAnchor(): Promise<void> {
+    const posture = this.posture;
+    if (!posture || !this.onBubbleAnchor) return;
+    const width = this.app.screen.width;
+    let anchor: BubbleAnchor;
+    if (posture === 'away') {
+      anchor = { x: width * DOOR_X, y: this.groundY() - (DOOR_HEIGHT + 6) * this.unit() * DOOR_SCALE };
+    } else {
+      const frames = await this.getFrames(posture);
+      if (!frames || posture !== this.posture) return;
+      let top = this.paintedTops.get(frames);
+      if (top === undefined) {
+        top = paintedTop(this.app.renderer, frames.textures, frames.offsetsY);
+        this.paintedTops.set(frames, top);
+      }
+      anchor = { x: width * CHARACTER_X, y: this.groundY() - (this.metadata.sheet.frameHeight - top) * this.baseScale() };
+    }
+    anchor = { x: Math.round(anchor.x), y: Math.round(anchor.y) };
+    if (sameAnchor(anchor, this.bubbleAnchor)) return;
+    this.bubbleAnchor = anchor;
+    this.onBubbleAnchor?.(anchor);
   }
 
   private snapTo(posture: Posture): void {

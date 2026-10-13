@@ -18,6 +18,15 @@ contextBridge.exposeInMainWorld('desktopFriends', {
     return () => ipcRenderer.removeListener('posture:timer', handler);
   },
   openMainWindow: (): void => ipcRenderer.send('app:open-main-window'),
+  authStore: {
+    canRemember: (): Promise<boolean> => ipcRenderer.invoke('auth-store:can-remember'),
+    read: (): Promise<Record<string, string> | null> => ipcRenderer.invoke('auth-store:read'),
+    write: (items: Record<string, string>): void => ipcRenderer.send('auth-store:write', items),
+    clear: (): void => ipcRenderer.send('auth-store:clear'),
+  },
+  account: {
+    setSignedIn: (signedIn: boolean): void => ipcRenderer.send('account:signed-in', signedIn),
+  },
   avatar: {
     moveTo: (x: number, y: number): void => ipcRenderer.send('avatar:move', x, y),
     endDrag: (): void => ipcRenderer.send('avatar:drag-end'),

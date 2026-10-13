@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AnimatedSprite, Application, Assets, Rectangle, Texture } from 'pixi.js';
 import 'pixi.js/unsafe-eval';
 import type { Activity } from '../../../shared/types';
+import { paintedTop, sameAnchor, type BubbleAnchor } from './bubbleAnchor';
 
 interface AnimationDefinition {
   image: string;
@@ -26,6 +27,8 @@ interface CrystalAnimationPreviewProps {
   displayName: string;
   activity: Activity;
   className?: string;
+  /** Reports the spot just above the character's head, for the countdown bubble. */
+  onBubbleAnchor?: (anchor: BubbleAnchor) => void;
 }
 
 export function CrystalAnimationPreview({
@@ -33,8 +36,11 @@ export function CrystalAnimationPreview({
   displayName,
   activity,
   className = 'avatar-preview-canvas',
+  onBubbleAnchor,
 }: CrystalAnimationPreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const onBubbleAnchorRef = useRef(onBubbleAnchor);
+  onBubbleAnchorRef.current = onBubbleAnchor;
   const [error, setError] = useState(false);
 
   useEffect(() => {
@@ -111,6 +117,8 @@ export function CrystalAnimationPreview({
           needsRender = true;
         };
         currentApplication.stage.addChild(sprite);
+        const headTop = paintedTop(currentApplication.renderer, frames);
+        let lastAnchor: BubbleAnchor | null = null;
         currentApplication.ticker.remove(currentApplication.render, currentApplication);
         currentApplication.ticker.add((ticker) => {
           sprite?.update(ticker);
@@ -128,6 +136,11 @@ export function CrystalAnimationPreview({
             const offsetX = animation.frameOffsetsX?.[sprite.currentFrame] ?? 0;
             sprite.scale.set(scale);
             sprite.position.set(width / 2 + offsetX * scale, height / 2);
+          }
+          const anchor = { x: Math.round(width / 2), y: Math.round(height / 2 + (headTop - frameHeight / 2) * scale) };
+          if (!sameAnchor(anchor, lastAnchor)) {
+            lastAnchor = anchor;
+            onBubbleAnchorRef.current?.(anchor);
           }
           needsRender = true;
         };
