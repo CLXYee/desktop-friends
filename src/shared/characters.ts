@@ -8,11 +8,11 @@ export const activities: { value: Activity; label: string }[] = [
 ];
 
 export const characters: { id: string; name: string; gestures?: Gesture[] }[] = [
-  { id: 'crystal', name: 'Crystal' },
-  { id: 'lovie', name: 'Lovie' },
-  { id: 'cloudy', name: 'Cloudy' },
+  { id: 'crystal', name: 'Crystal', gestures: ['leave', 'starJump'] },
+  { id: 'lovie', name: 'Lovie', gestures: ['leave', 'starJump'] },
+  { id: 'cloudy', name: 'Cloudy', gestures: ['leave', 'starJump'] },
   { id: 'starry', name: 'Starry', gestures: ['leave', 'starJump'] },
-  { id: 'clover', name: 'Clover' },
+  { id: 'clover', name: 'Clover', gestures: ['leave', 'starJump'] },
 ];
 
 export const hasGesture = (characterId: string, gesture: Gesture): boolean =>
