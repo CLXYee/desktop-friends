@@ -4,7 +4,8 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   build: {
     rollupOptions: {
-      external: ['electron', ...builtinModules],
+      // koffi loads a native binary at runtime, so it cannot be bundled; forge.config.ts ships it instead.
+      external: ['electron', 'koffi', ...builtinModules],
     },
   },
 });

@@ -1,26 +1,43 @@
-import { useState } from 'react';
-import type { Activity } from '../shared/types';
+import { useEffect, useRef, useState } from 'react';
+import { activities, characters, hasGesture, postureAsActivity, postureLabel } from '../shared/characters';
+import { defaultCompanionSettings } from '../shared/companionSettings';
+import type { Activity, CompanionSettings, CompanionSettingsUpdate } from '../shared/types';
 import { CrystalAnimationPreview } from './features/pets/CrystalAnimationPreview';
+import { characterThemeStyle } from './features/pets/characterThemes';
+import { LivelyAvatar, type LivelyAvatarHandle } from './features/pets/lively/LivelyAvatar';
+import { PostureCountdown, usePostureTimer } from './features/pets/PostureCountdown';
+import { PostureSettings } from './features/pets/PostureSettings';
 
-const activities: { value: Activity; label: string }[] = [
-  { value: 'waving', label: 'Waving' },
-  { value: 'studying', label: 'Studying' },
-  { value: 'sleeping', label: 'Sleeping' },
-  { value: 'gaming', label: 'Gaming' },
-];
-
-const characters = [
-  { id: 'crystal', name: 'Crystal' },
-  { id: 'lovie', name: 'Lovie' },
-  { id: 'cloudy', name: 'Cloudy' },
-  { id: 'starry', name: 'Starry' },
-  { id: 'clover', name: 'Clover' },
-];
+const AUTOMATIC = 'automatic';
 
 export function App() {
-  const [characterId, setCharacterId] = useState('crystal');
-  const [activity, setActivity] = useState<Activity>('waving');
+  const [settings, setSettings] = useState<CompanionSettings>(defaultCompanionSettings);
+  const { characterId, activity, avatarVisible } = settings;
   const character = characters.find((item) => item.id === characterId) ?? characters[0];
+  const activityLabel = postureLabel(activity).toLowerCase();
+  const livelyRef = useRef<LivelyAvatarHandle>(null);
+  const postureTimer = usePostureTimer();
+  const companion: Window['desktopFriends'] | undefined = window.desktopFriends;
+
+  // The pickers drive the friend on the desktop; tray menu and automatic posture changes flow back here.
+  useEffect(() => {
+    if (!companion) return;
+    let active = true;
+    const apply = (next: CompanionSettings) => {
+      if (active) setSettings(next);
+    };
+    void companion.getSettings().then(apply);
+    const unsubscribe = companion.onSettingsChanged(apply);
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [companion]);
+
+  const updateCompanion = (patch: CompanionSettingsUpdate) => {
+    setSettings((current) => ({ ...current, ...patch }));
+    companion?.updateSettings(patch);
+  };
 
   return (
     <main className="app-shell">
@@ -68,36 +85,85 @@ export function App() {
             <span className="online-count">0 ONLINE</span>
           </section>
 
-          <section className="empty-state">
-            <div className="preview-heading">
-              <p className="eyebrow">{character.name.toUpperCase()} / ANIMATION PREVIEW</p>
-              <span className="preview-live"><i />LIVE</span>
+          <section className="empty-state friend-stage" style={characterThemeStyle(character.id)}>
+            <div className="preview-column">
+              <div className="preview-heading">
+                <p className="eyebrow">{character.name.toUpperCase()} / ANIMATION PREVIEW</p>
+                <span className="preview-live"><i />LIVE</span>
+              </div>
+              <div
+                className={`avatar-preview-stage${character.gestures ? ' avatar-preview-stage-lively' : ''}`}
+                // Touching a lively friend in the preview counts like touching it on the desktop.
+                onPointerDown={character.gestures ? () => companion?.avatar.interact() : undefined}
+                onClick={character.gestures ? () => livelyRef.current?.jump() : undefined}
+              >
+                {settings.showTimer && settings.autoPosture && (
+                  <PostureCountdown
+                    timer={postureTimer}
+                    canTakeBreaks={hasGesture(character.id, 'leave')}
+                    className="posture-countdown-preview"
+                  />
+                )}
+                <span className="preview-sun" aria-hidden="true" />
+                <span className="preview-ground" aria-hidden="true" />
+                {character.gestures ? (
+                  <LivelyAvatar ref={livelyRef} characterId={character.id} displayName={character.name} posture={activity} />
+                ) : (
+                  <CrystalAnimationPreview
+                    characterId={character.id}
+                    displayName={character.name}
+                    activity={postureAsActivity(activity)}
+                  />
+                )}
+              </div>
+              <h2>{character.name}</h2>
+              <p className="empty-copy">
+                {settings.autoPosture
+                  ? `${character.name} is ${activityLabel} right now. Posture changes automatically.`
+                  : `Previewing ${activityLabel}.`}
+              </p>
+              <div className="preview-controls">
+                <label className="activity-picker">
+                  <span>Character</span>
+                  <select value={characterId} onChange={(event) => updateCompanion({ characterId: event.target.value })}>
+                    {characters.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                  </select>
+                </label>
+                <label className="activity-picker">
+                  <span>Animation</span>
+                  <select
+                    value={settings.autoPosture ? AUTOMATIC : activity}
+                    onChange={(event) => updateCompanion(
+                      event.target.value === AUTOMATIC
+                        ? { autoPosture: true }
+                        : { autoPosture: false, activity: event.target.value as Activity },
+                    )}
+                  >
+                    <option value={AUTOMATIC}>Automatic</option>
+                    {activities.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+                  </select>
+                </label>
+                {companion && (
+                  <label className="activity-picker">
+                    <input
+                      type="checkbox"
+                      checked={avatarVisible}
+                      onChange={(event) => updateCompanion({ avatarVisible: event.target.checked })}
+                    />
+                    <span>Show on desktop</span>
+                  </label>
+                )}
+              </div>
             </div>
-            <div className="avatar-preview-stage">
-              <span className="preview-sun" aria-hidden="true" />
-              <span className="preview-ground" aria-hidden="true" />
-              <CrystalAnimationPreview
-                characterId={character.id}
-                displayName={character.name}
-                activity={activity}
+
+            {companion && (
+              <PostureSettings
+                characterName={character.name}
+                canTakeBreaks={hasGesture(character.id, 'leave')}
+                settings={settings}
+                onChange={updateCompanion}
               />
-            </div>
-            <h2>{character.name}</h2>
-            <p className="empty-copy">Previewing {activities.find((item) => item.value === activity)?.label.toLowerCase()}.</p>
-            <div className="preview-controls">
-              <label className="activity-picker">
-                <span>Character</span>
-                <select value={characterId} onChange={(event) => setCharacterId(event.target.value)}>
-                  {characters.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                </select>
-              </label>
-              <label className="activity-picker">
-                <span>Animation</span>
-                <select value={activity} onChange={(event) => setActivity(event.target.value as Activity)}>
-                  {activities.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
-                </select>
-              </label>
-            </div>
+            )}
           </section>
 
           <footer className="workspace-footer">

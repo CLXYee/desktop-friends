@@ -25,9 +25,15 @@ interface CrystalAnimationPreviewProps {
   characterId: string;
   displayName: string;
   activity: Activity;
+  className?: string;
 }
 
-export function CrystalAnimationPreview({ characterId, displayName, activity }: CrystalAnimationPreviewProps) {
+export function CrystalAnimationPreview({
+  characterId,
+  displayName,
+  activity,
+  className = 'avatar-preview-canvas',
+}: CrystalAnimationPreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState(false);
 
@@ -91,7 +97,10 @@ export function CrystalAnimationPreview({ characterId, displayName, activity }: 
           });
         });
 
-        sprite = new AnimatedSprite(frames);
+        // Advance the sprite on this app's ticker (not Pixi's shared one) and draw only when the frame
+        // changes: every frame then lands on time, without redrawing an unchanged picture 60 times a second.
+        let needsRender = true;
+        sprite = new AnimatedSprite({ textures: frames, autoUpdate: false });
         sprite.anchor.set(0.5);
         sprite.animationSpeed = animation.fps / 60;
         sprite.loop = animation.loop;
@@ -99,8 +108,16 @@ export function CrystalAnimationPreview({ characterId, displayName, activity }: 
           if (!sprite) return;
           const offsetX = animation.frameOffsetsX?.[frameIndex] ?? 0;
           sprite.x = container.clientWidth / 2 + offsetX * sprite.scale.x;
+          needsRender = true;
         };
         currentApplication.stage.addChild(sprite);
+        currentApplication.ticker.remove(currentApplication.render, currentApplication);
+        currentApplication.ticker.add((ticker) => {
+          sprite?.update(ticker);
+          if (!needsRender) return;
+          needsRender = false;
+          currentApplication.render();
+        });
 
         const resize = () => {
           const width = container.clientWidth;
@@ -112,6 +129,7 @@ export function CrystalAnimationPreview({ characterId, displayName, activity }: 
             sprite.scale.set(scale);
             sprite.position.set(width / 2 + offsetX * scale, height / 2);
           }
+          needsRender = true;
         };
 
         resizeObserver = new ResizeObserver(resize);
@@ -137,7 +155,7 @@ export function CrystalAnimationPreview({ characterId, displayName, activity }: 
   return (
     <div
       ref={containerRef}
-      className="avatar-preview-canvas"
+      className={className}
       role="img"
       aria-label={`${displayName} ${activity} animation preview`}
     >
