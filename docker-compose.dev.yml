@@ -1,0 +1,18 @@
+# Local development: only nginx runs in Docker, in front of the backend you start with Maven.
+#
+#   cd backend && ./mvnw spring-boot:run           (backend on http://localhost:8080)
+#   docker compose -f docker-compose.dev.yml up -d   (nginx on http://localhost:8088)
+#
+# The app's frontend/.env then points at http://localhost:8088/api.
+services:
+  nginx:
+    image: nginx:1.29-alpine
+    environment:
+      BACKEND_UPSTREAM: host.docker.internal:8080
+      NGINX_ENVSUBST_FILTER: BACKEND_UPSTREAM
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./nginx/templates:/etc/nginx/templates:ro
+    ports:
+      - "8088:80"

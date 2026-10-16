@@ -1,0 +1,4 @@
+# Shell scripts must keep Unix line endings or they break inside Linux containers (e.g. the backend build).
+*.sh text eol=lf
+backend/mvnw text eol=lf
+*.cmd text eol=crlf

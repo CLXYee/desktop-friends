@@ -1,0 +1,76 @@
+# Desktop Friends API gateway. The desktop app talks only to this server; everything under /api/ goes to the
+# Spring Boot backend. The official nginx image fills in ${BACKEND_UPSTREAM} when the container starts
+# (backend:8080 in docker-compose.yml, host.docker.internal:8080 when the backend runs from Maven).
+
+# Logging in, signing up and refreshing: at most 30 a minute per address, so passwords can't be guessed quickly.
+limit_req_zone $binary_remote_addr zone=auth_requests:10m rate=30r/m;
+
+upstream desktop_friends_backend {
+    server ${BACKEND_UPSTREAM};
+    keepalive 16;
+}
+
+server {
+    listen 80;
+    server_name _;
+    server_tokens off;
+    client_max_body_size 64k;
+
+    # Every location below inherits these (a location that set its own would lose them all).
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+    proxy_set_header Host $http_host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-Host $http_host;
+
+    # The live event stream (Server-Sent Events): pass each event straight through and keep the connection open.
+    # The backend sends a keep-alive every 25 s and closes streams after 30 min; the app then reconnects.
+    location = /api/events {
+        proxy_pass http://desktop_friends_backend;
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 1h;
+        proxy_send_timeout 1h;
+    }
+
+    location ~ ^/api/auth/(login|signup|refresh)$ {
+        limit_req zone=auth_requests burst=20 nodelay;
+        limit_req_status 429;
+        proxy_pass http://desktop_friends_backend;
+        proxy_read_timeout 30s;
+    }
+
+    location /api/ {
+        proxy_pass http://desktop_friends_backend;
+        proxy_read_timeout 30s;
+    }
+
+    # nginx's own liveness check (the backend's is /api/health).
+    location = /nginx-health {
+        access_log off;
+        default_type text/plain;
+        return 200 "ok\n";
+    }
+
+    # Anything else isn't part of the API.
+    location / {
+        default_type application/json;
+        return 404 '{"status":404,"error":"There\'s nothing at this address."}';
+    }
+
+    # Too many login attempts, or the backend is down/starting: answer in the API's error format.
+    error_page 429 = @too_many_requests;
+    error_page 502 503 504 = @backend_unavailable;
+
+    location @too_many_requests {
+        default_type application/json;
+        return 429 '{"status":429,"error":"Too many attempts. Please wait a minute and try again."}';
+    }
+
+    location @backend_unavailable {
+        default_type application/json;
+        return 503 '{"status":503,"error":"The server is starting or unavailable. Try again in a moment."}';
+    }
+}

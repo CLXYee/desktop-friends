@@ -1,0 +1,31 @@
+# Full stack for a server: the Spring Boot backend behind nginx. The database stays in Supabase.
+#
+#   docker compose up -d --build
+#
+# The API is then at http://<server>:8088/api (put HTTPS in front of it, or change the port, for production).
+# Backend settings come from backend/.env (see backend/.env.example).
+services:
+  backend:
+    build: ./backend
+    env_file:
+      - path: ./backend/.env
+        # Take values literally (passwords may contain "$"), the same way Spring reads the file.
+        format: raw
+    restart: unless-stopped
+    expose:
+      - "8080"
+
+  nginx:
+    image: nginx:1.29-alpine
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      BACKEND_UPSTREAM: backend:8080
+      # Only ${BACKEND_UPSTREAM} is filled in, so nginx's own $variables are left alone.
+      NGINX_ENVSUBST_FILTER: BACKEND_UPSTREAM
+    volumes:
+      - ./nginx/templates:/etc/nginx/templates:ro
+    ports:
+      - "8088:80"
