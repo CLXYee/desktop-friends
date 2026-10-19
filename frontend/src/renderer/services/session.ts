@@ -12,7 +12,7 @@ export interface Session {
 
 /** How the backend returns a session (log in, sign up, refresh). */
 export interface AuthResponse extends Session {
-  profile: { id: string; username: string; displayName: string; role: 'user' | 'admin' };
+  profile: { id: string; username: string; displayName: string; role: 'user' | 'admin'; characterId?: string };
 }
 
 // Refresh a little before the access token expires, so requests never race its expiry.

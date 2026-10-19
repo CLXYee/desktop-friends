@@ -4,6 +4,7 @@ import { App } from './App';
 import { AccountProvider } from './features/auth/account';
 import { AccountGate } from './features/auth/AccountGate';
 import { DesktopAvatar } from './features/pets/DesktopAvatar';
+import { ChatProvider } from './features/chat/chat';
 import { SocialProvider } from './features/social/social';
 import './styles.css';
 
@@ -23,7 +24,9 @@ createRoot(rootElement).render(
       <AccountProvider>
         <AccountGate>
           <SocialProvider>
-            <App />
+            <ChatProvider>
+              <App />
+            </ChatProvider>
           </SocialProvider>
         </AccountGate>
       </AccountProvider>

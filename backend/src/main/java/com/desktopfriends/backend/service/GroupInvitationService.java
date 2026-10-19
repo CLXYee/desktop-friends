@@ -41,7 +41,9 @@ public class GroupInvitationService {
         String groupName = invitation.getGroup().getName();
         groupInvitationRepository.delete(invitation);
         groupInvitationRepository.flush();
-        groupMemberRepository.insertMemberIfAbsent(invitation.getGroupId(), userId);
+        if (groupMemberRepository.insertMemberIfAbsent(invitation.getGroupId(), userId) > 0) {
+            groupService.announceJoin(invitation.getGroupId(), userId);
+        }
         groupService.publishGroupsChanged(invitation.getGroupId(), Set.of(userId));
         return new JoinGroupResponse(invitation.getGroupId(), groupName);
     }

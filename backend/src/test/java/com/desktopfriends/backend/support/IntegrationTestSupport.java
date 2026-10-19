@@ -72,6 +72,15 @@ public abstract class IntegrationTestSupport {
                 JsonPath.read(body, "$.accessToken"), JsonPath.read(body, "$.refreshToken"));
     }
 
+    /** Makes two accounts friends (a request and its acceptance). */
+    protected void befriend(TestUser first, TestUser second) throws Exception {
+        postAs(first, "/api/friends/requests", Map.of("username", second.username()))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isCreated());
+        List<String> incoming = readList(getAs(second, "/api/friends"), "$.incoming[?(@.friend.username == '" + first.username() + "')].id");
+        postAs(second, "/api/friends/requests/" + incoming.getFirst() + "/accept")
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNoContent());
+    }
+
     protected ResultActions getAs(TestUser user, String url) throws Exception {
         return mockMvc.perform(authorized(get(url), user));
     }
@@ -86,6 +95,11 @@ public abstract class IntegrationTestSupport {
 
     protected ResultActions putAs(TestUser user, String url, Map<String, ?> body) throws Exception {
         return mockMvc.perform(authorized(put(url), user).contentType(MediaType.APPLICATION_JSON).content(json(body)));
+    }
+
+    protected ResultActions patchAs(TestUser user, String url, Map<String, ?> body) throws Exception {
+        return mockMvc.perform(authorized(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch(url), user)
+                .contentType(MediaType.APPLICATION_JSON).content(json(body)));
     }
 
     protected ResultActions deleteAs(TestUser user, String url) throws Exception {

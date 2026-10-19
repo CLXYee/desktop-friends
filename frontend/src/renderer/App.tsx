@@ -10,14 +10,21 @@ import { characterThemeStyle } from './features/pets/characterThemes';
 import { LivelyAvatar, type LivelyAvatarHandle } from './features/pets/lively/LivelyAvatar';
 import { PostureCountdown, usePostureTimer } from './features/pets/PostureCountdown';
 import { PostureSettings } from './features/pets/PostureSettings';
+import { CharacterAvatar } from './features/chat/CharacterAvatar';
+import { useChat } from './features/chat/chat';
+import { ChatsPage } from './features/chat/ChatsPage';
+import { updateMyCharacter } from './services/chat';
+import { totalUnread } from '../shared/chat';
 import { AddFriend } from './features/social/AddFriend';
 import { FriendPresence } from './features/social/FriendPresence';
-import { GroupsPage } from './features/social/GroupsPage';
 import { useSocial } from './features/social/social';
 
 const AUTOMATIC = 'automatic';
 
-type View = 'friends' | 'groups';
+type View = { page: 'friends' } | { page: 'chats'; conversationId: string | null };
+
+// The character picked here is also your avatar in chats; changes are sent to the server after a moment.
+const CHARACTER_SYNC_DELAY_MS = 600;
 
 export function App() {
   const [settings, setSettings] = useState<CompanionSettings>(defaultCompanionSettings);
@@ -28,7 +35,12 @@ export function App() {
   const [bubbleAnchor, setBubbleAnchor] = useState<BubbleAnchor | null>(null);
   const { profile, signOut } = useAccount();
   const { incoming, invitations, myPresence } = useSocial();
-  const [view, setView] = useState<View>('friends');
+  const { conversations } = useChat();
+  const [view, setView] = useState<View>({ page: 'friends' });
+  const openChat = (conversationId: string | null) => setView({ page: 'chats', conversationId });
+  const activeChatId = view.page === 'chats' ? view.conversationId : null;
+  const chatBadge = totalUnread(conversations) + invitations.length;
+  const activeChat = conversations.find((item) => item.id === activeChatId);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const postureTimer = usePostureTimer();
   const companion: Window['desktopFriends'] | undefined = window.desktopFriends;
@@ -48,6 +60,13 @@ export function App() {
     };
   }, [companion]);
 
+  // Your companion is your avatar: keep the server's copy in step with the one picked on this computer.
+  useEffect(() => {
+    if (!profile?.id || !companion) return;
+    const timer = setTimeout(() => void updateMyCharacter(characterId).catch(() => undefined), CHARACTER_SYNC_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [characterId, profile?.id, companion]);
+
   const updateCompanion = (patch: CompanionSettingsUpdate) => {
     setSettings((current) => ({ ...current, ...patch }));
     companion?.updateSettings(patch);
@@ -59,22 +78,24 @@ export function App() {
         <div className="brand-mark" aria-hidden="true">df</div>
         <div className="sidebar-label">YOUR SPACE</div>
         <button
-          className={`nav-item${view === 'friends' ? ' nav-item-active' : ''}`}
+          className={`nav-item${view.page === 'friends' ? ' nav-item-active' : ''}`}
           type="button"
-          aria-current={view === 'friends' ? 'page' : undefined}
-          onClick={() => setView('friends')}
+          aria-current={view.page === 'friends' ? 'page' : undefined}
+          onClick={() => setView({ page: 'friends' })}
         >
           <span className="nav-indicator" />Friends
           {incoming.length > 0 && <span className="nav-badge" aria-label={`${incoming.length} friend requests`}>{incoming.length}</span>}
         </button>
         <button
-          className={`nav-item${view === 'groups' ? ' nav-item-active' : ''}`}
+          className={`nav-item${view.page === 'chats' ? ' nav-item-active' : ''}`}
           type="button"
-          aria-current={view === 'groups' ? 'page' : undefined}
-          onClick={() => setView('groups')}
+          aria-current={view.page === 'chats' ? 'page' : undefined}
+          onClick={() => setView({ page: 'chats', conversationId: activeChatId })}
         >
-          <span className="nav-glyph">◇</span>Groups
-          {invitations.length > 0 && <span className="nav-badge" aria-label={`${invitations.length} group invitations`}>{invitations.length}</span>}
+          <span className="nav-glyph">◇</span>Chats
+          {chatBadge > 0 && (
+            <span className="nav-badge" aria-label={`${chatBadge} unread messages and invitations`}>{chatBadge > 99 ? '99+' : chatBadge}</span>
+          )}
         </button>
         <div className="sidebar-bottom" title="What your friends see">
           <span className={`connection-dot connection-dot-${myPresence}`} />
@@ -84,9 +105,12 @@ export function App() {
 
       <section className="content">
         <header className="topbar">
-          <div className="breadcrumb">YOUR SPACE <span>/</span> {view === 'friends' ? 'FRIENDS' : 'GROUPS'}</div>
+          <div className="breadcrumb">
+            YOUR SPACE <span>/</span> {view.page === 'friends' ? 'FRIENDS' : 'CHATS'}
+            {activeChat && <><span>/</span> {activeChat.title.toUpperCase()}</>}
+          </div>
           <div className="profile-chip">
-            <span className="profile-initial" aria-hidden="true">{profile?.displayName.charAt(0).toUpperCase() ?? '?'}</span>
+            <CharacterAvatar characterId={characterId} name={profile?.displayName ?? '?'} size={30} />
             <span className="profile-name">
               <strong>{profile?.displayName}</strong>
               <small>@{profile?.username}{profile?.role === 'admin' && <span className="profile-role">Admin</span>}</small>
@@ -105,8 +129,8 @@ export function App() {
           </div>
         </header>
 
-        <div className="page-content">
-          {view === 'groups' ? <GroupsPage /> : (
+        <div className={`page-content${view.page === 'chats' ? ' page-content-chat' : ''}`}>
+          {view.page === 'chats' ? <ChatsPage conversationId={view.conversationId} onOpen={openChat} /> : (
             <>
               <div className="page-heading">
                 <div>
@@ -116,7 +140,7 @@ export function App() {
                 <AddFriend />
               </div>
 
-              <FriendPresence />
+              <FriendPresence onOpenChat={openChat} />
 
               <section className="empty-state friend-stage" style={characterThemeStyle(character.id)}>
                 <div className="preview-column">
@@ -219,10 +243,12 @@ export function App() {
             </>
           )}
 
-          <footer className="workspace-footer">
-            <span>DESKTOP FRIENDS <span className="footer-divider">·</span> DEVELOPMENT BUILD</span>
-            <span>{window.desktopFriends?.platform ?? navigator.platform} <span className="footer-divider">·</span> v{window.desktopFriends?.appVersion ?? '0.1.0'}</span>
-          </footer>
+          {view.page !== 'chats' && (
+            <footer className="workspace-footer">
+              <span>DESKTOP FRIENDS <span className="footer-divider">·</span> DEVELOPMENT BUILD</span>
+              <span>{window.desktopFriends?.platform ?? navigator.platform} <span className="footer-divider">·</span> v{window.desktopFriends?.appVersion ?? '0.1.0'}</span>
+            </footer>
+          )}
         </div>
       </section>
     </main>

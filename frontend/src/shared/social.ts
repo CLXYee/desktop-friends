@@ -8,6 +8,7 @@ export const PRESENCE_HEARTBEAT_MS = 60_000;
 export const PRESENCE_IDLE_SECONDS = 5 * 60;
 
 export const GROUP_NAME_MAX = 40;
+export const GROUP_DESCRIPTION_MAX = 200;
 
 export const presenceStatuses: { value: PresenceStatus; label: string }[] = [
   { value: 'online', label: 'Online' },

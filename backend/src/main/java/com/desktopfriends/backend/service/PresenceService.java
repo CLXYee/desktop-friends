@@ -53,7 +53,7 @@ public class PresenceService {
     /** How someone appears to a person allowed to see them. */
     public FriendProfileResponse toFriendProfile(Profile profile) {
         return new FriendProfileResponse(profile.getId(), profile.getUsername(), profile.getDisplayName(),
-                effectivePresence(profile), profile.getLastSeenAt());
+                effectivePresence(profile), profile.getLastSeenAt(), profile.getCharacterId());
     }
 
     /**

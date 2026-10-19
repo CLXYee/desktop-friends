@@ -60,7 +60,7 @@ public class FriendshipService {
             } else {
                 // Asking someone doesn't let you see their status.
                 FriendProfileResponse hidden = new FriendProfileResponse(
-                        other.getId(), other.getUsername(), other.getDisplayName(), PresenceStatus.OFFLINE, null);
+                        other.getId(), other.getUsername(), other.getDisplayName(), PresenceStatus.OFFLINE, null, other.getCharacterId());
                 outgoing.add(toResponse(friendship, "outgoing", hidden));
             }
         }

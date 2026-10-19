@@ -3,7 +3,9 @@ import { countByPresence, lastSeenLabel, presenceLabel, presenceStatuses, sortBy
 import type { FriendProfile, PresenceStatus } from '../../../shared/types';
 import { removeFriend, respondFriendRequest } from '../../services/social';
 import { useSocial } from './social';
-import { Notice, PresenceDot, useSocialAction } from './socialUi';
+import { CharacterAvatar } from '../chat/CharacterAvatar';
+import { useChat } from '../chat/chat';
+import { Notice, useSocialAction } from './socialUi';
 
 type Filter = 'all' | PresenceStatus;
 
@@ -16,7 +18,8 @@ const statusText = (friend: FriendProfile): string => {
 };
 
 /** The presence bar on the Friends page: a dropdown listing friends by online status, plus requests. */
-export function FriendPresence() {
+export function FriendPresence({ onOpenChat }: { onOpenChat: (conversationId: string) => void }) {
+  const { openDirect } = useChat();
   const { status, error, friends, incoming, outgoing } = useSocial();
   const [isOpen, setIsOpen] = useState(false);
   const [filter, setFilter] = useState<Filter>('all');
@@ -70,7 +73,7 @@ export function FriendPresence() {
               <ul className="friend-list">
                 {incoming.map((request) => (
                   <li key={request.id} className="friend-row">
-                    <PresenceDot presence={request.friend.presence} />
+                    <CharacterAvatar characterId={request.friend.characterId} name={request.friend.displayName} size={30} presence={request.friend.presence} />
                     <span className="friend-name">
                       <strong>{request.friend.displayName}</strong>
                       <small>@{request.friend.username} wants to be friends</small>
@@ -125,13 +128,24 @@ export function FriendPresence() {
               <ul className="friend-list">
                 {shown.map((friend) => (
                   <li key={friend.id} className="friend-row">
-                    <PresenceDot presence={friend.presence} />
+                    <CharacterAvatar characterId={friend.characterId} name={friend.displayName} size={30} presence={friend.presence} />
                     <span className="friend-name">
                       <strong>{friend.displayName}</strong>
                       <small>@{friend.username}</small>
                     </span>
                     <span className={`friend-status friend-status-${friend.presence}`}>{statusText(friend)}</span>
                     <span className="friend-actions">
+                      {confirmRemoveId !== friend.id && (
+                        <button
+                          type="button"
+                          className="social-chip social-chip-primary"
+                          disabled={isBusy}
+                          aria-label={`Chat with ${friend.displayName}`}
+                          onClick={() => void run(`message:${friend.id}`, async () => onOpenChat(await openDirect(friend.id)))}
+                        >
+                          {busyKey === `message:${friend.id}` ? 'Opening…' : '💬 Chat'}
+                        </button>
+                      )}
                       {confirmRemoveId === friend.id ? (
                         <>
                           <button

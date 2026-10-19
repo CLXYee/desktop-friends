@@ -21,7 +21,7 @@ export const UNREACHABLE_MESSAGE = "Can't reach the server. Check your internet 
 export const SESSION_ENDED_MESSAGE = 'Your session ended. Log in again.';
 
 interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: unknown;
   /** Send the access token (default). Off for logging in, signing up and refreshing. */
   auth?: boolean;

@@ -89,6 +89,17 @@ export const createTrayIcon = (characterId: string): NativeImage => {
   ]);
 };
 
+// Chat avatars: the same head crop, as a small PNG data URL the main window can show. Cached per character.
+const portraitUrls = new Map<string, string | null>();
+
+export const characterPortraitDataUrl = (characterId: string): string | null => {
+  if (!portraitUrls.has(characterId)) {
+    const portrait = loadCharacterPortrait(characterId);
+    portraitUrls.set(characterId, portrait ? portrait.resize({ width: 96, height: 96, quality: 'best' }).toDataURL() : null);
+  }
+  return portraitUrls.get(characterId) ?? null;
+};
+
 export const createWindowIcon = (characterId: string): NativeImage => {
   const portrait = loadCharacterPortrait(characterId) ?? loadCharacterPortrait('crystal') ?? createFallbackIcon(256);
   return portrait.resize({ width: 256, height: 256, quality: 'best' });

@@ -8,7 +8,7 @@ import type { CompanionSettings, CompanionSettingsUpdate, PostureTimer, Presence
 import { canRememberSession, clearRememberedSession, readRememberedSession, writeRememberedSession } from './authStore';
 import { watchFullscreen } from './fullscreenWatcher';
 import { loadSettings, saveSettings } from './settings';
-import { createTrayIcon, createWindowIcon } from './trayIcon';
+import { characterPortraitDataUrl, createTrayIcon, createWindowIcon } from './trayIcon';
 
 const AVATAR_SCREEN_MARGIN = 24;
 // On Windows, Electron's default "floating" level parks the window just behind the taskbar. While a
@@ -473,6 +473,8 @@ const createTray = (): void => {
 const registerIpc = (): void => {
   ipcMain.handle('settings:get', () => settings);
   ipcMain.handle('posture:get-timer', () => postureTimer);
+  // Chat avatars: a character's portrait as a data URL (null for an unknown character).
+  ipcMain.handle('avatar:portrait', (_event, characterId: unknown) => (isCharacterId(characterId) ? characterPortraitDataUrl(characterId) : null));
 
   ipcMain.on('settings:update', (_event, patch: CompanionSettingsUpdate) => {
     if (typeof patch !== 'object' || patch === null) return;

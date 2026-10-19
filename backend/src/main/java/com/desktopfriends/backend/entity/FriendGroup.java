@@ -25,6 +25,13 @@ public class FriendGroup {
     @Column(name = "invite_code", nullable = false, unique = true)
     private String inviteCode;
 
+    @Column(nullable = false)
+    private String description = "";
+
+    /** The companion character the group uses as its avatar and colour theme. */
+    @Column(name = "character_id", nullable = false)
+    private String characterId = "crystal";
+
     @Column(name = "created_by")
     private UUID createdBy;
 
@@ -34,8 +41,10 @@ public class FriendGroup {
     protected FriendGroup() {
     }
 
-    public FriendGroup(String name, String inviteCode, UUID createdBy, Instant createdAt) {
+    public FriendGroup(String name, String description, String characterId, String inviteCode, UUID createdBy, Instant createdAt) {
         this.name = name;
+        this.description = description;
+        this.characterId = characterId;
         this.inviteCode = inviteCode;
         this.createdBy = createdBy;
         this.createdAt = createdAt;
@@ -51,6 +60,21 @@ public class FriendGroup {
 
     public String getInviteCode() {
         return inviteCode;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public String getCharacterId() {
+        return characterId;
+    }
+
+    /** Changes what the owner may edit: name, description and character (nulls keep the current value). */
+    public void updateDetails(String name, String description, String characterId) {
+        if (name != null) this.name = name;
+        if (description != null) this.description = description;
+        if (characterId != null) this.characterId = characterId;
     }
 
     public UUID getCreatedBy() {

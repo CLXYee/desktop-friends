@@ -58,9 +58,13 @@ export const fetchGroups = (): Promise<FriendGroup[]> => apiRequest<FriendGroup[
 
 export const fetchGroupInvitations = (): Promise<GroupInvitation[]> => apiRequest<GroupInvitation[]>('/group-invitations');
 
-/** Creates a group with you as its owner; returns its id. */
-export const createGroup = async (name: string): Promise<string> =>
-  (await apiRequest<FriendGroup>('/groups', { method: 'POST', body: { name } })).id;
+/** Creates a group with you as its owner (and its chat); returns the group. */
+export const createGroup = (name: string, description = '', characterId?: string): Promise<FriendGroup> =>
+  apiRequest<FriendGroup>('/groups', { method: 'POST', body: { name, description, characterId: characterId ?? null } });
+
+/** Owner only: changes the name, description or character (fields left out stay as they are). */
+export const updateGroup = (groupId: string, changes: { name?: string; description?: string; characterId?: string }): Promise<FriendGroup> =>
+  apiRequest<FriendGroup>(`/groups/${encodeURIComponent(groupId)}`, { method: 'PATCH', body: changes });
 
 export const inviteToGroup = (groupId: string, friendId: string): Promise<void> =>
   apiRequest(`/groups/${encodeURIComponent(groupId)}/invitations`, { method: 'POST', body: { friendId } });

@@ -24,6 +24,7 @@ interface Window {
     account: {
       setSignedIn: (signedIn: boolean) => void;
     };
+    characterPortrait: (characterId: string) => Promise<string | null>;
     presence: {
       getStatus: () => Promise<import('../shared/types').PresenceStatus>;
       onStatus: (listener: (status: import('../shared/types').PresenceStatus) => void) => () => void;

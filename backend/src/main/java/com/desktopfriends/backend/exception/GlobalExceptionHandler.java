@@ -3,7 +3,9 @@ package com.desktopfriends.backend.exception;
 import com.desktopfriends.backend.dto.response.ErrorResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -41,9 +43,9 @@ public class GlobalExceptionHandler {
         return respond(HttpStatus.BAD_REQUEST, "The request isn't in the expected format.");
     }
 
-    /** Two requests raced (e.g. both people sent a request at the same moment). */
-    @ExceptionHandler(DataIntegrityViolationException.class)
-    public ResponseEntity<ErrorResponse> handleConflict(DataIntegrityViolationException exception) {
+    /** Two requests raced (e.g. both people sent a request at the same moment, or a row went away meanwhile). */
+    @ExceptionHandler({DataIntegrityViolationException.class, OptimisticLockingFailureException.class})
+    public ResponseEntity<ErrorResponse> handleConflict(DataAccessException exception) {
         log.debug("Constraint violation", exception);
         return respond(HttpStatus.CONFLICT, "That just changed. Refresh and try again.");
     }

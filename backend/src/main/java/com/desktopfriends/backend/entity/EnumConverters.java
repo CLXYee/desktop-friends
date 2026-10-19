@@ -47,4 +47,30 @@ public final class EnumConverters {
             return value == null ? null : GroupRole.fromValue(value);
         }
     }
+
+    @Converter(autoApply = true)
+    public static class ConversationKindConverter implements AttributeConverter<ConversationKind, String> {
+        @Override
+        public String convertToDatabaseColumn(ConversationKind kind) {
+            return kind == null ? null : kind.getValue();
+        }
+
+        @Override
+        public ConversationKind convertToEntityAttribute(String value) {
+            return value == null ? null : ConversationKind.fromValue(value);
+        }
+    }
+
+    @Converter(autoApply = true)
+    public static class MessageKindConverter implements AttributeConverter<MessageKind, String> {
+        @Override
+        public String convertToDatabaseColumn(MessageKind kind) {
+            return kind == null ? null : kind.getValue();
+        }
+
+        @Override
+        public MessageKind convertToEntityAttribute(String value) {
+            return value == null ? null : MessageKind.fromValue(value);
+        }
+    }
 }

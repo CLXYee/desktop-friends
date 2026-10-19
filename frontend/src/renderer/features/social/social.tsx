@@ -9,7 +9,7 @@ import {
   startReportingPresence,
   stopReportingPresence,
 } from '../../services/social';
-import { openEventStream } from '../../services/eventStream';
+import { subscribeToLiveEvents } from '../../services/liveEvents';
 import { useAccount } from '../auth/account';
 
 // The backend's event stream delivers changes as they happen; this poll is the safety net, and it is also
@@ -126,7 +126,7 @@ export function SocialProvider({ children }: { children: ReactNode }) {
     };
     void refresh();
 
-    const closeStream = openEventStream(({ name, data }) => {
+    const closeStream = subscribeToLiveEvents(({ name, data }) => {
       if (name === 'presence' && isPresenceChange(data)) {
         setFriendships((current) => current.map((item) => ({ ...item, friend: patchPresence(item.friend, data) })));
         setGroups((current) => current.map((group) => ({ ...group, members: group.members.map((member) => patchPresence(member, data)) })));

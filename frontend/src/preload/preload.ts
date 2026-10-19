@@ -27,6 +27,8 @@ contextBridge.exposeInMainWorld('desktopFriends', {
   account: {
     setSignedIn: (signedIn: boolean): void => ipcRenderer.send('account:signed-in', signedIn),
   },
+  /** A character's portrait (head crop) as a PNG data URL, for chat avatars. */
+  characterPortrait: (characterId: string): Promise<string | null> => ipcRenderer.invoke('avatar:portrait', characterId),
   presence: {
     getStatus: (): Promise<PresenceStatus> => ipcRenderer.invoke('presence:get'),
     /** Called when the user goes idle or comes back, and every minute as a heartbeat. */

@@ -10,7 +10,7 @@ import org.hibernate.annotations.DynamicUpdate;
 
 /**
  * One row per account (public.profiles). Supabase creates it when someone signs up; the backend only
- * changes the online status.
+ * changes the online status and the character.
  */
 @Entity
 @Table(name = "profiles")
@@ -34,6 +34,10 @@ public class Profile {
 
     @Column(name = "last_seen_at")
     private Instant lastSeenAt;
+
+    /** The companion character the user picked in the app; their avatar. */
+    @Column(name = "character_id", nullable = false)
+    private String characterId = "crystal";
 
     protected Profile() {
     }
@@ -60,6 +64,14 @@ public class Profile {
 
     public Instant getLastSeenAt() {
         return lastSeenAt;
+    }
+
+    public String getCharacterId() {
+        return characterId;
+    }
+
+    public void changeCharacter(String characterId) {
+        this.characterId = characterId;
     }
 
     /** Records a status report from the app (also the heartbeat). */

@@ -56,7 +56,7 @@ The app holds no database or Supabase keys; only the backend does (in `backend/.
 Checks:
 
 ```sh
-cd backend  && ./mvnw test          # 48 tests: the whole API against a real Postgres with the Supabase schema
+cd backend  && ./mvnw test          # 70 tests: the whole API against a real Postgres with the Supabase schema
 cd frontend && npm run typecheck && npm test
 cd frontend && npm run users:test && npm run test:e2e   # against the running backend (see below)
 ```
@@ -73,7 +73,7 @@ On a server with Docker, put `backend/.env` in place and run, from the project r
 docker compose up -d --build
 ```
 
-This builds the backend image (Maven Wrapper, Java 21, non-root) and starts it behind nginx on port 8088. Put HTTPS in front of nginx (or terminate TLS in it) for anything public. See [backend/README.md](backend/README.md) for the API and how it is organized.
+This builds the backend image (Maven Wrapper, Java 21, non-root) and starts it behind nginx on port 8088. Keep `--build` whenever the code has changed: a plain `docker compose up` reuses the old image, and an image older than a feature answers that feature's requests with 404 ("There's nothing at this address"). Put HTTPS in front of nginx (or terminate TLS in it) for anything public. See [backend/README.md](backend/README.md) for the API and how it is organized.
 
 ## Desktop companion
 
@@ -107,12 +107,22 @@ The main window opens on a **Log in / Sign up** page, greeted by a random friend
 - The **friends dropdown** (the bar under the page title) lists your friends as **Online**, **Idle** or **Offline**, with a **Show** filter. It updates live through the backend's event stream (`/api/events`, Server-Sent Events), with a 30-second refresh as a safety net.
 - Your status is reported by the app: **online** after logging in, **idle** after 5 minutes without keyboard or mouse input (or while the screen is locked), **offline** when you log out or quit. The app re-reports it every minute; if it stops (e.g. it crashed), friends see you as offline after 3 minutes. The sidebar footer shows what your friends see.
 - Sending a request does not reveal the other person's status; only friends and fellow group members see it.
-- **Groups** (sidebar): create a group (you become its owner), invite friends from the group's card, or share its **invite link** (`desktop-friends://join/<code>`), which anyone can paste into **Join with a link**. Invitations show up under Groups with a badge in the sidebar. Members see each other's status. The owner can reset the link so older links stop working; when the owner leaves, the longest-standing member takes over, and the last member to leave deletes the group. Invite links are pasted into the app; clicking one does not open the app yet.
+- **Groups are group chats** (sidebar → **Chats**): **＋ New group** creates one (you become its owner) or joins one with an **invite link** (`desktop-friends://join/<code>`). Members, inviting friends, the invite link and leaving are in the chat's **ⓘ Group info** panel. Invitations show at the top of the chat list, with a badge on **Chats**. Members see each other's status. The owner can reset the link so older links stop working; when the owner leaves, the longest-standing member takes over, and the last member to leave deletes the group. Invite links are pasted into the app; clicking one does not open the app yet.
 
 Supabase project settings this relies on:
 
 - **Authentication → Sign In / Providers → Email → Confirm email: off**, otherwise sign-up waits for an email nobody receives.
 - Recommended: **Authentication → Policies (password requirements)**: minimum length 8 and "lowercase, uppercase letters, digits and symbols", so the server enforces the same rule as the form.
+
+## Chats
+
+The **Chats** page works like a normal chat app: one list of chats (groups and friends together, newest first,
+only chats with a record), the open chat beside it, and **＋ New chat** / **＋ New group** in the top-right
+corner. **💬 Chat** next to a friend starts a chat directly. Each message shows the sender's avatar (the
+companion they picked), name and time, with the date above the first message of each day; messages, edits,
+reactions and "is typing" update live. Details: [docs/chat.md](docs/chat.md) and
+[docs/chats-page.md](docs/chats-page.md). To test with two users on one computer, run `npm run start:second`
+next to `npm run start` (see the latter doc).
 
 ## Avatar artwork
 

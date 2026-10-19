@@ -17,6 +17,8 @@ export interface FriendProfile {
   displayName: string;
   presence: PresenceStatus;
   lastSeenAt: string | null;
+  /** The companion character they picked; shown as their avatar. */
+  characterId: string;
 }
 
 /** A friendship from the signed-in user's side: an accepted friend or a request either way. */
@@ -35,8 +37,13 @@ export interface GroupMember extends FriendProfile {
 export interface FriendGroup {
   id: string;
   name: string;
+  description: string;
+  /** The companion character the group uses as its avatar and colour theme. */
+  characterId: string;
   inviteCode: string;
   createdAt: string;
+  /** The group's chat. */
+  conversationId: string | null;
   /** Owner first, then by when they joined. */
   members: GroupMember[];
   /** People already invited and not yet answered (their ids). */
@@ -52,12 +59,54 @@ export interface GroupInvitation {
   createdAt: string;
 }
 
-export interface FriendMessage {
+/** Someone in a chat: their name and the character shown as their avatar. */
+export interface ChatUser {
   id: string;
-  senderId: string;
-  recipientId: string;
+  username: string;
+  displayName: string;
+  characterId: string;
+}
+
+/** A chat message. kind "system" is a note from the app ("Ben joined the group."). */
+export interface ChatMessage {
+  id: number;
+  conversationId: string;
+  /** Null once their account is gone. */
+  sender: ChatUser | null;
+  /** Empty when deleted. */
   body: string;
+  kind: 'text' | 'system';
+  replyTo: { id: number; senderName: string; body: string; deleted: boolean } | null;
   createdAt: string;
+  editedAt: string | null;
+  deleted: boolean;
+  /** One entry per emoji, in picker order. */
+  reactions: { emoji: string; userIds: string[] }[];
+}
+
+/** A chat in the user's list: a group's chat or a direct chat with a friend. */
+export interface Conversation {
+  id: string;
+  kind: 'group' | 'direct';
+  /** The group's name, or the friend's. */
+  title: string;
+  characterId: string | null;
+  group: { id: string; description: string; memberCount: number } | null;
+  partner: FriendProfile | null;
+  /** False in a direct chat with someone who is no longer a friend. */
+  canSend: boolean;
+  lastMessage: ChatMessage | null;
+  lastMessageAt: string | null;
+  unreadCount: number;
+  muted: boolean;
+  createdAt: string;
+}
+
+/** Up to 50 messages, oldest first; nextCursor fetches the page before them. */
+export interface MessagePage {
+  messages: ChatMessage[];
+  hasMore: boolean;
+  nextCursor: number | null;
 }
 
 export interface CompanionSettings {

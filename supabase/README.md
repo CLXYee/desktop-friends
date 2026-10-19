@@ -12,8 +12,13 @@ files to a throwaway Postgres.
 
 - `20261013000000_profiles.sql`: the `profiles` table for user data, its row-level security policies, and the trigger that creates a profile when someone signs up through Supabase Auth.
 - `20261015000000_friends_presence_groups.sql`: online status on `profiles` (`status`, `last_seen_at`), the `friendships`, `groups`, `group_members` and `group_invitations` tables with their indexes and row-level security, and Realtime for those tables. Safe to run again.
+- `20261019000000_chat.sql`: chats. `conversations` (one per group, at most one per pair of people),
+  `conversation_members` (access and unread), `messages` (ordered ids, soft delete), `message_reactions`,
+  plus `groups.description` / `groups.character_id` and `profiles.character_id`. Triggers create a group's
+  chat with the group and keep its members in step; existing groups were backfilled. Only the backend reads
+  and writes these tables (no API grants). Details: [docs/chat.md](../docs/chat.md).
 
-That second migration also defines database functions (`send_friend_request`, `create_group`, `leave_group`,
+The second migration also defines database functions (`send_friend_request`, `create_group`, `leave_group`,
 …) and Realtime publication from when the app talked to Supabase directly. The backend now implements those
 rules itself (`backend/src/main/java/com/desktopfriends/backend/service`) and no longer calls them; they are
 kept so older app builds keep working, and can be dropped once none are in use.

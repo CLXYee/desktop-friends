@@ -17,6 +17,8 @@ export interface Profile {
   username: string;
   displayName: string;
   role: 'user' | 'admin';
+  /** The companion shown as their avatar in chats. */
+  characterId?: string;
 }
 
 export type AccountStatus = 'loading' | 'signed-out' | 'signed-in' | 'unconfigured';

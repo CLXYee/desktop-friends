@@ -88,7 +88,7 @@ afterAll(async () => {
   await social.sendFriendRequest('friend_amy');
   await social.sendFriendRequest('friend_ben');
   as('amy');
-  const groupId = await social.createGroup('Study Buddies');
+  const groupId = (await social.createGroup('Study Buddies')).id;
   await social.inviteToGroup(groupId, ids.ben);
   await social.inviteToGroup(groupId, ids.cleo);
   as('ben');
@@ -249,7 +249,7 @@ describe('3. groups', () => {
 
   it('creates a group with you as owner', async () => {
     as('amy');
-    groupId = await social.createGroup('  Test Group ');
+    groupId = (await social.createGroup('  Test Group ')).id;
     const [group] = await social.fetchGroups();
     expect(group).toMatchObject({ id: groupId, name: 'Test Group', invitedIds: [] });
     expect(group.members.map((member) => [member.username, member.role])).toEqual([['friend_amy', 'owner']]);
